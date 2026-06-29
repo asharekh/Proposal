@@ -127,6 +127,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    if (body.save_only) {
+      return NextResponse.json({
+        success: true,
+        proposal_id: proposalId,
+        save_only: true,
+      });
+    }
+
     let tenantName = "معهد التميز للتدريب";
 
     // 3. Fetch Tenant Details

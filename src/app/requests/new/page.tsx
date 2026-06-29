@@ -143,7 +143,7 @@ export default function NewRequest() {
     }
   };
 
-  // Submit to API
+  // Submit to API to save only (AI generation is done from details page)
   const handleGenerate = async () => {
     if (!formData.title.trim()) {
       alert("يرجى إدخال اسم الدورة أو البرنامج التدريبي.");
@@ -156,18 +156,10 @@ export default function NewRequest() {
 
     setLoading(true);
     setError(null);
-    setLoadingStep(0);
-
-    // Simulate loading step transitions for smooth UI feel
-    const interval = setInterval(() => {
-      setLoadingStep((prev) => {
-        if (prev < 3) return prev + 1;
-        return prev;
-      });
-    }, 4000);
 
     try {
       const payload = {
+        save_only: true,
         rfp: {
           title: formData.title,
           client_name: formData.client_name,
@@ -195,27 +187,16 @@ export default function NewRequest() {
         body: JSON.stringify(payload),
       });
 
-      clearInterval(interval);
-
       const json = await res.json();
       if (json.success) {
-        setLoadingStep(4); // Finished
         setTimeout(() => {
           router.push(`/proposals/${json.proposal_id}`);
-        }, 1200);
-      } else if (json.rfp_saved) {
-        // Safe redirect on AI failure but RFP saved
-        setLoadingStep(4);
-        alert(`تم حفظ طلب التدريب بنجاح، ولكن واجه محرك الذكاء الاصطناعي مشكلة أثناء التوليد: ${json.error}. سيتم نقلك لصفحة المراجعة لتوليد العرض يدوياً.`);
-        setTimeout(() => {
-          router.push(`/proposals/${json.proposal_id}`);
-        }, 1500);
+        }, 800);
       } else {
-        setError(json.error || "حدث خطأ غير متوقع أثناء حفظ وتوليد العرض.");
+        setError(json.error || "حدث خطأ غير متوقع أثناء حفظ العرض.");
         setLoading(false);
       }
     } catch (err: any) {
-      clearInterval(interval);
       setError("فشل الاتصال بالخادم. يرجى التحقق من الشبكة وإعادة المحاولة.");
       setLoading(false);
     }
@@ -663,41 +644,15 @@ export default function NewRequest() {
       {/* HIGH-FIDELITY AI GENERATION PROGRESS OVERLAY */}
       {loading && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl max-w-md w-full p-8 text-center space-y-6 shadow-2xl animate-scale-up">
+          <div className="bg-white border border-gray-200 rounded-2xl max-w-md w-full p-8 text-center space-y-4 shadow-2xl animate-scale-up">
             {/* Loading Indicator */}
-            <div className="relative flex items-center justify-center w-20 h-20 mx-auto">
-              <Loader2 className="w-16 h-16 animate-spin text-emerald-600" />
-              <Sparkles className="w-6 h-6 text-emerald-500 absolute animate-pulse" />
+            <div className="relative flex items-center justify-center w-16 h-16 mx-auto">
+              <Loader2 className="w-12 h-12 animate-spin text-emerald-600" />
             </div>
 
-            <div className="space-y-2">
-              <h3 className="font-bold text-gray-900 text-lg">جاري حفظ ومعالجة طلب التدريب</h3>
-              <p className="text-xs text-gray-500">يرجى الانتظار، نقوم بتحليل البيانات وصياغة العرض الفني والمالي...</p>
-            </div>
-
-            {/* Dynamic Step Progress */}
-            <div className="space-y-2.5 text-right max-w-sm mx-auto bg-gray-50 p-4 rounded-xl border border-gray-150">
-              {loadingMessages.map((msg, idx) => {
-                const isCompleted = loadingStep > idx;
-                const isCurrent = loadingStep === idx;
-
-                return (
-                  <div key={idx} className="flex items-center gap-2.5 text-xs font-semibold">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${
-                      isCompleted 
-                        ? "bg-emerald-600 text-white" 
-                        : isCurrent 
-                          ? "bg-emerald-100 text-emerald-700 ring-2 ring-emerald-500/10 animate-pulse" 
-                          : "bg-gray-200 text-gray-400"
-                    }`}>
-                      {isCompleted ? "✓" : idx + 1}
-                    </div>
-                    <span className={`${isCurrent ? "text-emerald-700 font-bold" : isCompleted ? "text-gray-600" : "text-gray-400"}`}>
-                      {msg}
-                    </span>
-                  </div>
-                );
-              })}
+            <div className="space-y-1">
+              <h3 className="font-bold text-gray-900 text-base">جاري حفظ طلب التدريب</h3>
+              <p className="text-xs text-gray-500">يرجى الانتظار، يتم الآن تسجيل الطلب وتوجيهك لصفحة العرض التدريبي...</p>
             </div>
           </div>
         </div>
