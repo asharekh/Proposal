@@ -26,18 +26,6 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install Chromium and system dependencies required for Puppeteer rendering
-RUN apt-get update && apt-get install -y \
-    chromium \
-    fonts-liberation \
-    libatk-bridge2.0-0 \
-    libgtk-3-0 \
-    libnss3 \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
 # Add a non-root group and user
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nextjs
 
