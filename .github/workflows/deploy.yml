@@ -1,0 +1,37 @@
+name: Deploy AI Proposal Engine
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH into DigitalOcean Droplet and Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd /var/www/proposal-engine
+            git pull origin main
+            
+            # Rebuild and start container services
+            export GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
+            export NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}"
+            docker compose build app
+            docker compose up -d app
+            
+            # Clean up dangling images to save disk space
+            docker image prune -f
+            
+            # Wait for container startup
+            sleep 10
+            
+            # Perform health check
+            echo "Running deployment health check..."
+            curl -sf http://localhost:3000/api/health || (echo "Deployment health check failed!" && exit 1)
+            echo "Deployment succeeded!"
