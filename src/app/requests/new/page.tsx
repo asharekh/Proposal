@@ -203,7 +203,8 @@ export default function NewRequest() {
   };
 
   return (
-    <div className="max-w-[1300px] mx-auto space-y-6 animate-fade-in relative pb-16">
+    <>
+      <div className="max-w-[1300px] mx-auto space-y-6 animate-fade-in relative pb-16">
       
       {/* Top Header / Breadcrumb */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-100 pb-5">
@@ -657,7 +658,6 @@ export default function NewRequest() {
           </div>
         </div>
       )}
-
-    </div>
+    </>
   );
 }

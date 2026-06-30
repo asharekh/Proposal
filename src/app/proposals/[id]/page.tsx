@@ -336,7 +336,8 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
   const isContentEmpty = !content || (!content.executive_summary && !content.about_institute);
 
   return (
-    <div className="space-y-8 animate-fade-in relative">
+    <>
+      <div className="space-y-8 animate-fade-in relative">
       {/* Back link */}
       <Link href="/proposals" className="text-xs font-semibold text-gray-500 hover:text-gray-900 flex items-center gap-1.5 no-print">
         <ArrowRight className="w-4 h-4" />
@@ -1130,6 +1131,6 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
