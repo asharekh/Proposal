@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryOne, memoryStore, checkDbConnection } from "@/lib/db";
+import { query, queryOne, memoryStore, checkDbConnection } from "@/lib/db";
 import { isMockMode, getTenantId } from "@/lib/config";
 import { ProposalContent, RFPInput, Tenant } from "@/types";
 import { getEnv } from "@/lib/env";
