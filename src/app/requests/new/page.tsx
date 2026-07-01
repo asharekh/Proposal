@@ -639,7 +639,7 @@ export default function NewRequest() {
               </div>
             </form>
           </div>
-        </div>
+      )}
       </div>
 
       {/* HIGH-FIDELITY AI GENERATION PROGRESS OVERLAY */}
