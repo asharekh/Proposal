@@ -639,6 +639,7 @@ export default function NewRequest() {
               </div>
             </form>
           </div>
+        </div>
       )}
       </div>
 
