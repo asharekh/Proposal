@@ -1090,6 +1090,7 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
         </div>
 
       </div>
+      </div>
 
       {/* HIGH-FIDELITY AI GENERATION PROGRESS OVERLAY */}
       {generating && (

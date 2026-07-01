@@ -640,7 +640,7 @@ export default function NewRequest() {
             </form>
           </div>
         </div>
-      )}
+      </div>
 
       {/* HIGH-FIDELITY AI GENERATION PROGRESS OVERLAY */}
       {loading && (
