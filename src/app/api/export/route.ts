@@ -872,7 +872,14 @@ export async function GET(req: NextRequest) {
     const safeTitle = rfp.title ? rfp.title.replace(/[\s/\\?%*:|"<>\s]+/g, "_") : "Proposal";
     const safeClient = rfp.client_name ? rfp.client_name.replace(/[\s/\\?%*:|"<>\s]+/g, "_") : "";
     const baseName = `عرض_تدريب_${safeTitle}${safeClient ? `_${safeClient}` : ""}`;
-    const encodedBaseName = encodeURIComponent(baseName);
+    
+    // Strict RFC 5987 / RFC 6266 encoding to bypass browser parsing bugs (e.g. parenthesis must be encoded)
+    const encodedBaseName = encodeURIComponent(baseName)
+      .replace(/'/g, '%27')
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29')
+      .replace(/\*/g, '%2A')
+      .replace(/!/g, '%21');
 
     // FORMAT 1: WORD (.docx)
     if (format === "docx") {
