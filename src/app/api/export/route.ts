@@ -868,13 +868,19 @@ export async function GET(req: NextRequest) {
     const rfp = proposal.rfp_data;
     const content = proposal.draft_content;
 
+    // Clean up filename parameters to support Arabic characters in Content-Disposition
+    const safeTitle = rfp.title ? rfp.title.replace(/[\s/\\?%*:|"<>\s]+/g, "_") : "Proposal";
+    const safeClient = rfp.client_name ? rfp.client_name.replace(/[\s/\\?%*:|"<>\s]+/g, "_") : "";
+    const baseName = `عرض_تدريب_${safeTitle}${safeClient ? `_${safeClient}` : ""}`;
+    const encodedBaseName = encodeURIComponent(baseName);
+
     // FORMAT 1: WORD (.docx)
     if (format === "docx") {
       const buffer = await generateDocx(rfp, content, tenant);
       return new NextResponse(buffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "Content-Disposition": `attachment; filename="Proposal_${proposal.id}.docx"`,
+          "Content-Disposition": `attachment; filename="${proposal.id}.docx"; filename*=UTF-8''${encodedBaseName}.docx`,
         },
       });
     }
@@ -885,7 +891,7 @@ export async function GET(req: NextRequest) {
       return new NextResponse(buffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-          "Content-Disposition": `attachment; filename="Presentation_${proposal.id}.pptx"`,
+          "Content-Disposition": `attachment; filename="${proposal.id}.pptx"; filename*=UTF-8''${encodedBaseName}.pptx`,
         },
       });
     }
@@ -914,7 +920,7 @@ export async function GET(req: NextRequest) {
           return new NextResponse(pdfBuffer, {
             headers: {
               "Content-Type": "application/pdf",
-              "Content-Disposition": `attachment; filename="Proposal_${proposal.id}.pdf"`,
+              "Content-Disposition": `attachment; filename="${proposal.id}.pdf"; filename*=UTF-8''${encodedBaseName}.pdf`,
             },
           });
         } catch (error) {

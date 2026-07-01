@@ -335,6 +335,11 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
   const isApproved = proposal.review_status === "approved" || proposal.review_status === "exported";
   const isContentEmpty = !content || (!content.executive_summary && !content.about_institute);
 
+  // Generate safe Arabic download filename
+  const safeTitle = rfp.title ? rfp.title.replace(/[\s/\\?%*:|"<>\s]+/g, "_") : "Proposal";
+  const safeClient = rfp.client_name ? rfp.client_name.replace(/[\s/\\?%*:|"<>\s]+/g, "_") : "";
+  const downloadFileName = `عرض_تدريب_${safeTitle}${safeClient ? `_${safeClient}` : ""}`;
+
   return (
     <>
       <div className="space-y-8 animate-fade-in relative">
@@ -398,7 +403,7 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
               {/* Word */}
               <a
                 href={`/api/export?id=${proposal.id}&format=docx`}
-                download={`Proposal_${proposal.id}.docx`}
+                download={`${downloadFileName}.docx`}
                 className="px-3.5 py-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
               >
                 <FileDown className="w-4 h-4" />
@@ -408,7 +413,7 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
               {/* PPT */}
               <a
                 href={`/api/export?id=${proposal.id}&format=pptx`}
-                download={`Presentation_${proposal.id}.pptx`}
+                download={`${downloadFileName}.pptx`}
                 className="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
               >
                 <FileOutput className="w-4 h-4" />
@@ -418,6 +423,7 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
               {/* PDF */}
               <a
                 href={`/api/export?id=${proposal.id}&format=pdf`}
+                download={`${downloadFileName}.pdf`}
                 target="_blank"
                 className="px-3.5 py-2.5 bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
               >

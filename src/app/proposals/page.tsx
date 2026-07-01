@@ -118,7 +118,10 @@ export default function ProposalsList() {
               combined: "فني ومالي",
             };
 
-            const isApproved = proposal.review_status === "approved";
+            const isApproved = proposal.review_status === "approved" || proposal.review_status === "exported";
+            const safeTitle = proposal.rfp_title ? proposal.rfp_title.replace(/[\s/\\?%*:|"<>\s]+/g, "_") : "Proposal";
+            const safeClient = proposal.client_name ? proposal.client_name.replace(/[\s/\\?%*:|"<>\s]+/g, "_") : "";
+            const downloadFileName = `عرض_تدريب_${safeTitle}${safeClient ? `_${safeClient}` : ""}`;
 
             return (
               <div key={proposal.id} className="premium-card bg-white p-6 flex flex-col justify-between space-y-6">
@@ -180,7 +183,7 @@ export default function ProposalsList() {
                       {/* Word Export Button */}
                       <a 
                         href={`/api/export?id=${proposal.id}&format=docx`}
-                        download={`Proposal_${proposal.id}.docx`}
+                        download={`${downloadFileName}.docx`}
                         title="تصدير كملف Word"
                         className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg transition-all"
                       >
@@ -190,7 +193,7 @@ export default function ProposalsList() {
                       {/* PowerPoint Export Button */}
                       <a 
                         href={`/api/export?id=${proposal.id}&format=pptx`}
-                        download={`Presentation_${proposal.id}.pptx`}
+                        download={`${downloadFileName}.pptx`}
                         title="تصدير كعرض PowerPoint"
                         className="p-2 bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200 rounded-lg transition-all"
                       >
