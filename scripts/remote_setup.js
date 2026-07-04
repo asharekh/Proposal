@@ -8,37 +8,42 @@ const fallbackKey = part1 + part2;
 const geminiKey = process.env.GEMINI_API_KEY || fallbackKey;
 
 conn.on('ready', () => {
-  console.log('SSH connection established for clean restart workaround...');
+  console.log('SSH connection established for RAG upgrades deployment...');
   
   const setupSwapAndBuild = `
     cd /var/www/proposal-engine
     
-    # 1. Force match origin/main exactly to bypass divergent branch pull warnings
+    # 1. Force match origin/main exactly to pull latest code
     git fetch origin
     git reset --hard origin/main
     git clean -fd
     
-    # 2. Free up disk space from old dangling docker assets
+    # 2. Run Database SQL Migration (pipe migration.sql into db container psql)
+    echo "Running PostgreSQL database migration..."
+    docker exec -i proposal_engine_db psql -U postgres -d proposal_engine < scripts/migration.sql
+    
+    # 3. Free up disk space from old dangling docker assets
     echo "Pruning unused Docker assets..."
     docker system prune -a -f
     
-    # Check free disk space
-    df -h
-    
-    # 3. Build and restart
+    # 4. Build and restart Next.js app container
     export GEMINI_API_KEY="${geminiKey}"
-    
-    # Force clean build without cache to resolve content digest lookup failures
     docker-compose build --no-cache app
     
-    # Workaround for legacy docker-compose KeyError bug: delete the container first
     echo "Removing old container to prevent docker-compose KeyError..."
     docker rm -f proposal_engine_app || true
-    
     docker-compose up -d app
+    
+    # Wait for the container to start up (approx 5-10 seconds)
+    echo "Waiting for app container to start..."
+    sleep 8
+    
+    # 5. Run backfill migration script inside container to segment existing proposals
+    echo "Running backfill segment migration inside nextjs container..."
+    docker-compose exec -T app node scripts/migrate_existing.js
   `;
 
-  console.log('Starting remote build and container recreation...');
+  console.log('Starting remote build, database migration, and container recreation...');
   
   conn.exec(setupSwapAndBuild, (err, stream) => {
     if (err) {
