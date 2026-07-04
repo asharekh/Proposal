@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, executeIsolatedQuery, memoryStore, checkDbConnection } from "@/lib/db";
 import { isMockMode, getTenantId } from "@/lib/config";
-import { extractTextFromFile, checkExtractionQuality } from "@/lib/extractor";
+import { extractTextFromFile, checkExtractionQuality, splitTextIntoChunks } from "@/lib/extractor";
 import { getEmbedding } from "@/lib/embeddings";
 import { Proposal } from "@/types";
 
@@ -134,6 +134,7 @@ export async function POST(req: NextRequest) {
     const proposalId = await executeIsolatedQuery(tenantId, async (client) => {
       if (!client) return null;
       
+      // 1. Insert parent proposal record
       const sql = `
         INSERT INTO proposals (tenant_id, rfp_title, training_type, sector, content_text, status, embedding, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7::vector, NOW())
@@ -150,7 +151,35 @@ export async function POST(req: NextRequest) {
         status,
         vectorStr,
       ]);
-      return res.rows[0].id;
+      const parentId = res.rows[0].id;
+
+      // 2. Segment and insert semantic chunks
+      const chunks = splitTextIntoChunks(extractedText, 1200, 150);
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkText = chunks[i];
+        
+        let chunkEmbedding: number[] = [];
+        try {
+          chunkEmbedding = await getEmbedding(chunkText, {
+            title: rfpTitle,
+            trainingType: trainingType || undefined,
+            sector: sector || undefined,
+          });
+        } catch (err) {
+          console.error(`Failed to generate embedding for chunk ${i}:`, err);
+          // Fallback pseudo-random embedding vector if Gemini API fails
+          chunkEmbedding = Array.from({ length: 768 }, (_, k) => Math.sin(k + i) * 0.1);
+        }
+
+        const chunkVectorStr = `[${chunkEmbedding.join(",")}]`;
+        const chunkSql = `
+          INSERT INTO proposal_chunks (proposal_id, tenant_id, chunk_index, content_text, embedding, created_at)
+          VALUES ($1, $2, $3, $4, $5::vector, NOW())
+        `;
+        await client.query(chunkSql, [parentId, tenantId, i, chunkText, chunkVectorStr]);
+      }
+
+      return parentId;
     });
 
     return NextResponse.json({

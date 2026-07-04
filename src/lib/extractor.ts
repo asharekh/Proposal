@@ -144,3 +144,64 @@ export const extractTextFromFile = async (
   // Clean and normalize
   return normalizeArabic(rawText);
 };
+
+/**
+ * Splits text into overlapping chunks of a target size, preferring paragraph and sentence boundaries.
+ */
+export const splitTextIntoChunks = (
+  text: string,
+  chunkSize: number = 1200,
+  overlapSize: number = 150
+): string[] => {
+  if (!text) return [];
+  const normalized = text.trim();
+  if (normalized.length <= chunkSize) {
+    return [normalized];
+  }
+
+  const chunks: string[] = [];
+  let startIndex = 0;
+
+  while (startIndex < normalized.length) {
+    let endIndex = startIndex + chunkSize;
+    
+    if (endIndex < normalized.length) {
+      // Find a clean boundary in the last 20% of the chunk range
+      const searchStart = Math.max(startIndex, endIndex - Math.floor(chunkSize * 0.2));
+      const boundarySub = normalized.substring(searchStart, endIndex);
+      
+      // Look for paragraph or sentence boundaries
+      let boundaryIdx = -1;
+      
+      // Try paragraph boundary first
+      boundaryIdx = boundarySub.lastIndexOf("\n");
+      // If not found, try sentence boundaries
+      if (boundaryIdx === -1) {
+        boundaryIdx = Math.max(
+          boundarySub.lastIndexOf("."),
+          boundarySub.lastIndexOf("!")
+        );
+      }
+      // If still not found, try space
+      if (boundaryIdx === -1) {
+        boundaryIdx = boundarySub.lastIndexOf(" ");
+      }
+      
+      if (boundaryIdx !== -1) {
+        endIndex = searchStart + boundaryIdx + 1;
+      }
+    } else {
+      endIndex = normalized.length;
+    }
+
+    const chunk = normalized.substring(startIndex, endIndex).trim();
+    if (chunk) {
+      chunks.push(chunk);
+    }
+
+    // Set start of next chunk with sliding overlap
+    startIndex = Math.max(startIndex + 1, endIndex - overlapSize);
+  }
+
+  return chunks;
+};

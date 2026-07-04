@@ -65,28 +65,29 @@ export const findSimilarProposals = async (
     // 1. Get count first
     const countRow = await queryOne<{ count: string }>(
       tenantId,
-      "SELECT COUNT(*) as count FROM proposals"
+      "SELECT COUNT(*) as count FROM proposal_chunks"
     );
     if (!countRow || parseInt(countRow.count, 10) === 0) {
-      console.log("Vector search cold start: proposals table is empty.");
+      console.log("Vector search cold start: proposal_chunks table is empty.");
       return [];
     }
 
     // 2. Generate search vector
     const vector = await getEmbedding(rfpText);
 
-    // 3. Cosine similarity query (pgvector format)
+    // 3. Cosine similarity query over semantic chunks
     const sql = `
       SELECT 
-        id, 
-        rfp_title, 
-        training_type, 
-        sector, 
-        content_text, 
-        status,
-        (1 - (embedding <=> $1::vector)) as similarity
-      FROM proposals 
-      WHERE tenant_id = $2 AND (1 - (embedding <=> $1::vector)) > 0.2
+        c.id, 
+        p.rfp_title, 
+        p.training_type, 
+        p.sector, 
+        c.content_text, 
+        p.status,
+        (1 - (c.embedding <=> $1::vector)) as similarity
+      FROM proposal_chunks c
+      JOIN proposals p ON c.proposal_id = p.id
+      WHERE c.tenant_id = $2 AND (1 - (c.embedding <=> $1::vector)) > 0.2
       ORDER BY similarity DESC 
       LIMIT $3
     `;
@@ -95,7 +96,7 @@ export const findSimilarProposals = async (
     const vectorStr = `[${vector.join(",")}]`;
     const results = await query<SimilarProposal>(tenantId, sql, [vectorStr, tenantId, limit]);
     
-    console.log(`[DB Vector Search] Found ${results.length} proposals with similarity > 0.2.`);
+    console.log(`[DB Vector Search] Found ${results.length} semantic chunks with similarity > 0.2.`);
     return results;
   } catch (error) {
     console.error("Vector search failed on DB:", error);
