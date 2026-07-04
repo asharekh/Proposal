@@ -42,7 +42,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   experimental: {
-    serverComponentsExternalPackages: ["pdf-parse", "mammoth", "pg", "puppeteer-core"],
+    serverComponentsExternalPackages: ["pdf-parse", "mammoth", "pg", "puppeteer-core", "@google/generative-ai"],
     serverActions: {
       bodySizeLimit: "20mb",
     },
