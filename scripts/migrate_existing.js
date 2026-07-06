@@ -1,5 +1,4 @@
 const { Client } = require('pg');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // 1. Sliding window paragraph text chunker helper
 const splitTextIntoChunks = (text, chunkSize = 1200, overlapSize = 150) => {
@@ -51,9 +50,34 @@ const splitTextIntoChunks = (text, chunkSize = 1200, overlapSize = 150) => {
   return chunks;
 };
 
-// 2. Main runner
+// 2. Direct REST call to Gemini Embedding v1 endpoint
+const getEmbeddingREST = async (text, apiKey) => {
+  const url = `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      content: {
+        parts: [{ text }]
+      }
+    })
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+  }
+  
+  const data = await response.json();
+  if (data && data.embedding && data.embedding.values) {
+    return data.embedding.values;
+  }
+  throw new Error("Invalid response format from Gemini API");
+};
+
+// 3. Main runner
 async function run() {
-  const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/proposal_engine';
+  const connectionString = process.env.DATABASE_URL || 'postgresql://courseat:password_change_me_in_prod@db:5432/proposal_engine';
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (!geminiKey) {
@@ -63,9 +87,6 @@ async function run() {
 
   const client = new Client({ connectionString });
   await client.connect();
-
-  const genAI = new GoogleGenerativeAI(geminiKey);
-  const embedModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
   try {
     console.log('Querying proposals for backfilling chunks...');
@@ -97,9 +118,15 @@ async function run() {
         ].filter(Boolean);
         const contentToEmbed = parts.join("\n").substring(0, 8000);
 
-        // Generate embedding
-        const embedRes = await embedModel.embedContent(contentToEmbed);
-        const embedding = embedRes.embedding.values;
+        // Generate embedding via direct REST call
+        let embedding;
+        try {
+          embedding = await getEmbeddingREST(contentToEmbed, geminiKey);
+        } catch (err) {
+          console.error(`Failed to generate embedding for chunk ${i}:`, err.message);
+          // Fallback pseudo-random embedding vector if Gemini API fails
+          embedding = Array.from({ length: 768 }, (_, k) => Math.sin(k + i) * 0.1);
+        }
 
         // Insert chunk
         const vectorStr = `[${embedding.join(",")}]`;

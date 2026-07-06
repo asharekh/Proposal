@@ -49,12 +49,26 @@ export const getEmbedding = async (
   }
 
   try {
-    const ai = getGenAI();
-    const model = ai.getGenerativeModel({ model: "text-embedding-004" });
-    const result = await model.embedContent(contentToEmbed);
+    const env = getEnv();
+    const url = `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${env.GEMINI_API_KEY}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: {
+          parts: [{ text: contentToEmbed }]
+        }
+      })
+    });
     
-    if (result && result.embedding && result.embedding.values) {
-      return result.embedding.values;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    if (data && data.embedding && data.embedding.values) {
+      return data.embedding.values;
     }
     throw new Error("Invalid response format from Google Embeddings API");
   } catch (error) {
