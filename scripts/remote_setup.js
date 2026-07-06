@@ -39,8 +39,12 @@ conn.on('ready', () => {
     sleep 8
     
     # 5. Run backfill migration script inside container to segment existing proposals
-    echo "Running backfill segment migration inside nextjs container..."
-    docker-compose exec -T app node scripts/migrate_existing.js
+    echo "Copying backfill script into container..."
+    docker cp scripts/migrate_existing.js proposal_engine_app:/app/migrate_existing.js
+    echo "Running backfill segment migration..."
+    docker exec -i proposal_engine_app node migrate_existing.js
+    echo "Cleaning up temp files..."
+    docker exec -i proposal_engine_app rm -f migrate_existing.js
   `;
 
   console.log('Starting remote build, database migration, and container recreation...');
