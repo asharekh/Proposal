@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, memoryStore, checkDbConnection } from "@/lib/db";
 import { isMockMode, getTenantId } from "@/lib/config";
-import { ProposalContent, RFPInput, Tenant } from "@/types";
+import { ProposalContent, RFPInput, Tenant, GeneratedProposal } from "@/types";
 import { getEnv } from "@/lib/env";
 
 // docx library imports
@@ -379,21 +379,41 @@ async function generateDocx(rfp: RFPInput, content: ProposalContent, tenant: Ten
 }
 
 // PowerPoint export generator
-function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): Promise<Buffer> {
+function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant, templateMetadata?: any): Promise<Buffer> {
   const pptx = new pptxgen();
   pptx.layout = "LAYOUT_16x9";
-  
+
+  // Load dynamic styles from reference template or fallback to defaults
+  const colors = templateMetadata?.colors || {
+    primary: "16A34A",
+    secondary: "111827",
+    bg_dark: "111827",
+    bg_light: "FFFFFF",
+    text_dark: "374151",
+    text_light: "FFFFFF",
+  };
+
+  const cleanHex = (hex: string) => hex.replace("#", "").trim();
+  const cPrimary = cleanHex(colors.primary);
+  const cSecondary = cleanHex(colors.secondary);
+  const cBgDark = cleanHex(colors.bg_dark);
+  const cBgLight = cleanHex(colors.bg_light);
+  const cTextDark = cleanHex(colors.text_dark);
+  const cTextLight = cleanHex(colors.text_light);
+
+  const fontFace = templateMetadata?.fonts?.body || "Arial";
+
   // Slide 1: Cover Slide
   const slide1 = pptx.addSlide();
-  slide1.background = { color: "111827" }; // Dark slate bg
+  slide1.background = { color: cBgDark };
   
   slide1.addShape("rect", {
     x: 0,
     y: 0,
     w: 13.33,
     h: 0.5,
-    fill: { color: "16A34A" },
-  });
+    fill: { color: cPrimary },
+  } as any);
 
   // Client target banner
   slide1.addText(tenant.name, {
@@ -402,12 +422,12 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
     w: 8.0,
     h: 0.5,
     fontSize: 24,
-    color: "16A34A",
+    color: cPrimary,
     bold: true,
-    fontFace: "Arial",
+    fontFace,
     align: "right",
     rtl: true,
-  });
+  } as any);
 
   slide1.addText(rfp.title, {
     x: 1.0,
@@ -415,12 +435,12 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
     w: 8.0,
     h: 1.2,
     fontSize: 36,
-    color: "FFFFFF",
+    color: cTextLight,
     bold: true,
-    fontFace: "Arial",
+    fontFace,
     align: "right",
     rtl: true,
-  });
+  } as any);
 
   slide1.addText(`عرض فني ومالي لشركة: ${rfp.client_name}`, {
     x: 1.0,
@@ -429,20 +449,22 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
     h: 0.5,
     fontSize: 20,
     color: "9CA3AF",
-    fontFace: "Arial",
+    fontFace,
     align: "right",
     rtl: true,
-  });
+  } as any);
 
   // Slide 2: Executive Summary
   const slide2 = pptx.addSlide();
-  slide2.addText("1. الملخص التنفيذي", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: "16A34A", bold: true, align: "right", rtl: true });
-  slide2.addText(content.executive_summary, { x: 0.5, y: 1.3, w: 9.0, h: 4.5, fontSize: 16, color: "374151", align: "right", rtl: true });
+  slide2.background = { color: cBgLight };
+  slide2.addText("1. الملخص التنفيذي", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+  slide2.addText(content.executive_summary, { x: 0.5, y: 1.3, w: 9.0, h: 4.5, fontSize: 16, color: cTextDark, fontFace, align: "right", rtl: true } as any);
 
   // Slide 3: Methodology Overview
   const slide3 = pptx.addSlide();
-  slide3.addText("2. المنهجية والأسلوب التدريبي", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: "16A34A", bold: true, align: "right", rtl: true });
-  slide3.addText(content.methodology?.approach || "", { x: 0.5, y: 1.2, w: 9.0, h: 1.5, fontSize: 15, color: "374151", align: "right", rtl: true });
+  slide3.background = { color: cBgLight };
+  slide3.addText("2. المنهجية والأسلوب التدريبي", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+  slide3.addText(content.methodology?.approach || "", { x: 0.5, y: 1.2, w: 9.0, h: 1.5, fontSize: 15, color: cTextDark, fontFace, align: "right", rtl: true } as any);
 
   // Phase boxes
   (content.methodology?.phases || []).forEach((p, idx) => {
@@ -457,7 +479,7 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
       h: 2.5,
       fill: { color: "F3F4F6" },
       line: { color: "E5E7EB", width: 1 },
-    });
+    } as any);
 
     slide3.addText(`المرحلة ${p.number}\n${p.title}`, {
       x: boxX,
@@ -466,10 +488,11 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
       h: 0.6,
       fontSize: 14,
       bold: true,
-      color: "16A34A",
+      color: cPrimary,
+      fontFace,
       align: "center",
       rtl: true,
-    });
+    } as any);
 
     slide3.addText(p.description.substring(0, 150), {
       x: boxX + 0.1,
@@ -477,35 +500,38 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
       w: 2.6,
       h: 1.6,
       fontSize: 11,
-      color: "4B5563",
+      color: cTextDark,
+      fontFace,
       align: "right",
       rtl: true,
-    });
+    } as any);
   });
 
   // Slide 4: One slide per phase (details)
   (content.methodology?.phases || []).forEach((p) => {
     const slidePhase = pptx.addSlide();
-    slidePhase.addText(`مرحلة التدريب ${p.number}: ${p.title}`, { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: "16A34A", bold: true, align: "right", rtl: true });
-    slidePhase.addText(`المدة المقررة: ${p.duration}`, { x: 0.5, y: 1.1, w: 9.0, h: 0.4, fontSize: 16, color: "6B7280", align: "right", rtl: true });
+    slidePhase.background = { color: cBgLight };
+    slidePhase.addText(`مرحلة التدريب ${p.number}: ${p.title}`, { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+    slidePhase.addText(`المدة المقررة: ${p.duration}`, { x: 0.5, y: 1.1, w: 9.0, h: 0.4, fontSize: 16, color: "6B7280", fontFace, align: "right", rtl: true } as any);
     
-    slidePhase.addText(p.description, { x: 0.5, y: 1.6, w: 9.0, h: 1.2, fontSize: 15, color: "374151", align: "right", rtl: true });
+    slidePhase.addText(p.description, { x: 0.5, y: 1.6, w: 9.0, h: 1.2, fontSize: 15, color: cTextDark, fontFace, align: "right", rtl: true } as any);
 
     // Objectives list
-    slidePhase.addText("أهداف ومخرجات المرحلة الأساسية:", { x: 0.5, y: 2.9, w: 9.0, h: 0.4, fontSize: 16, bold: true, color: "111827", align: "right", rtl: true });
+    slidePhase.addText("أهداف ومخرجات المرحلة الأساسية:", { x: 0.5, y: 2.9, w: 9.0, h: 0.4, fontSize: 16, bold: true, color: cSecondary, fontFace, align: "right", rtl: true } as any);
     
     const objText = p.objectives.map((obj) => `• ${obj}`).join("\n\n");
-    slidePhase.addText(objText, { x: 0.5, y: 3.4, w: 9.0, h: 2.2, fontSize: 14, color: "4B5563", align: "right", rtl: true });
+    slidePhase.addText(objText, { x: 0.5, y: 3.4, w: 9.0, h: 2.2, fontSize: 14, color: cTextDark, fontFace, align: "right", rtl: true } as any);
   });
 
   // Slide 5: Timeline
   const slide5 = pptx.addSlide();
-  slide5.addText("3. الجدول الزمني وتوزيع الأيام", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: "16A34A", bold: true, align: "right", rtl: true });
+  slide5.background = { color: cBgLight };
+  slide5.addText("3. الجدول الزمني وتوزيع الأيام", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
 
-  const timelineRows = [
+  const timelineRows: any[] = [
     [
-      { text: "النشاط التدريبي والمحاور المغطاة", options: { bold: true, fill: "16A34A", color: "FFFFFF" } },
-      { text: "اليوم / الفترة", options: { bold: true, fill: "16A34A", color: "FFFFFF", align: "center" } }
+      { text: "النشاط التدريبي والمحاور المغطاة", options: { bold: true, fill: cPrimary, color: cTextLight } },
+      { text: "اليوم / الفترة", options: { bold: true, fill: cPrimary, color: cTextLight, align: "center" } }
     ]
   ];
 
@@ -523,12 +549,14 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
     colW: [7.0, 2.0],
     border: { color: "E5E7EB", width: 1 },
     fontSize: 12,
-  });
+    fontFace,
+  } as any);
 
   // Slide 6: Financial Offer (if applicable)
   if (rfp.proposal_type !== "technical" && content.financial) {
     const slide6 = pptx.addSlide();
-    slide6.addText("4. العرض المالي والرسوم المقترحة", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: "16A34A", bold: true, align: "right", rtl: true });
+    slide6.background = { color: cBgLight };
+    slide6.addText("4. العرض المالي والرسوم المقترحة", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
 
     const isAnyPriceNull = content.financial.breakdown.some((b) => b.unit_price === null);
 
@@ -541,17 +569,18 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
         fontSize: 14,
         bold: true,
         color: "D97706",
+        fontFace,
         align: "right",
         rtl: true,
-      });
+      } as any);
     }
 
-    const financialRows = [
+    const financialRows: any[] = [
       [
-        { text: "المجموع الكلي (ريال)", options: { bold: true, fill: "16A34A", color: "FFFFFF" } },
-        { text: "سعر الوحدة (ريال)", options: { bold: true, fill: "16A34A", color: "FFFFFF" } },
-        { text: "الكمية", options: { bold: true, fill: "16A34A", color: "FFFFFF" } },
-        { text: "الخدمة / البند التدريبي", options: { bold: true, fill: "16A34A", color: "FFFFFF" } }
+        { text: "المجموع الكلي (ريال)", options: { bold: true, fill: cPrimary, color: cTextLight } },
+        { text: "سعر الوحدة (ريال)", options: { bold: true, fill: cPrimary, color: cTextLight } },
+        { text: "الكمية", options: { bold: true, fill: cPrimary, color: cTextLight } },
+        { text: "الخدمة / البند التدريبي", options: { bold: true, fill: cPrimary, color: cTextLight } }
       ]
     ];
 
@@ -571,7 +600,8 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
       colW: [2.0, 2.0, 1.0, 4.0],
       border: { color: "E5E7EB", width: 1 },
       fontSize: 11,
-    });
+      fontFace,
+    } as any);
 
     slide6.addText(`شروط السداد: ${content.financial.payment_terms}`, {
       x: 0.5,
@@ -579,15 +609,16 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
       w: 9.0,
       h: 0.8,
       fontSize: 12,
-      color: "4B5563",
+      color: cTextDark,
+      fontFace,
       align: "right",
       rtl: true,
-    });
+    } as any);
   }
 
   // Slide 7: Closing slide
   const slide7 = pptx.addSlide();
-  slide7.background = { color: "111827" };
+  slide7.background = { color: cBgDark };
   
   slide7.addText("نشكر لكم اهتمامكم وثقتكم", {
     x: 1.0,
@@ -595,11 +626,12 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
     w: 8.0,
     h: 0.8,
     fontSize: 32,
-    color: "16A34A",
+    color: cPrimary,
     bold: true,
+    fontFace,
     align: "center",
     rtl: true,
-  });
+  } as any);
 
   slide7.addText(`معهد التدريب: ${tenant.name}\nالهاتف: ${tenant.phone || ""}\nالبريد الإلكتروني: ${tenant.email || ""}\nالعنوان: ${tenant.address || ""}`, {
     x: 1.0,
@@ -607,10 +639,11 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant): 
     w: 8.0,
     h: 1.8,
     fontSize: 16,
-    color: "FFFFFF",
+    color: cTextLight,
+    fontFace,
     align: "center",
     rtl: true,
-  });
+  } as any);
 
   return pptx.write({ outputType: "nodebuffer" }) as Promise<Buffer>;
 }
@@ -828,7 +861,7 @@ export async function GET(req: NextRequest) {
     } else {
       const dbRow = await queryOne(
         tenantId,
-        "SELECT id, tenant_id, rfp_data, draft_content, review_status, created_at FROM generated_proposals WHERE id = $1 AND tenant_id = $2",
+        "SELECT id, tenant_id, rfp_data, draft_content, review_status, compliance_score, compliance_checklist, reference_proposal_ids, created_at FROM generated_proposals WHERE id = $1 AND tenant_id = $2",
         [id, tenantId]
       );
       if (dbRow) {
@@ -840,7 +873,7 @@ export async function GET(req: NextRequest) {
           review_status: dbRow.review_status,
           compliance_score: dbRow.compliance_score,
           compliance_checklist: dbRow.compliance_checklist,
-          reference_proposal_ids: dbRow.reference_proposal_ids,
+          reference_proposal_ids: typeof dbRow.reference_proposal_ids === "string" ? JSON.parse(dbRow.reference_proposal_ids) : dbRow.reference_proposal_ids,
           created_at: dbRow.created_at,
         };
       }
@@ -855,6 +888,27 @@ export async function GET(req: NextRequest) {
 
     if (!proposal) {
       return new NextResponse("Proposal not found", { status: 404 });
+    }
+
+    // Load template metadata from primary reference proposal if present
+    let templateMetadata: any = null;
+    if (proposal.reference_proposal_ids && proposal.reference_proposal_ids.length > 0) {
+      const refId = proposal.reference_proposal_ids[0];
+      if (!isDbConnected) {
+        const refProp = memoryStore.proposals.get(refId);
+        if (refProp) templateMetadata = (refProp as any).template_metadata || null;
+      } else {
+        const refRow = await queryOne<{ template_metadata: any }>(
+          tenantId,
+          "SELECT template_metadata FROM proposals WHERE id = $1",
+          [refId]
+        );
+        if (refRow && refRow.template_metadata) {
+          templateMetadata = typeof refRow.template_metadata === "string" 
+            ? JSON.parse(refRow.template_metadata) 
+            : refRow.template_metadata;
+        }
+      }
     }
 
     // Update status to exported
@@ -884,7 +938,7 @@ export async function GET(req: NextRequest) {
     // FORMAT 1: WORD (.docx)
     if (format === "docx") {
       const buffer = await generateDocx(rfp, content, tenant);
-      return new NextResponse(buffer, {
+      return new NextResponse(buffer as any, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
           "Content-Disposition": `attachment; filename="${proposal.id}.docx"; filename*=UTF-8''${encodedBaseName}.docx`,
@@ -894,8 +948,8 @@ export async function GET(req: NextRequest) {
 
     // FORMAT 2: POWERPOINT (.pptx)
     if (format === "pptx") {
-      const buffer = await generatePptx(rfp, content, tenant);
-      return new NextResponse(buffer, {
+      const buffer = await generatePptx(rfp, content, tenant, templateMetadata);
+      return new NextResponse(buffer as any, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
           "Content-Disposition": `attachment; filename="${proposal.id}.pptx"; filename*=UTF-8''${encodedBaseName}.pptx`,
@@ -924,7 +978,7 @@ export async function GET(req: NextRequest) {
           });
           await browser.close();
 
-          return new NextResponse(pdfBuffer, {
+          return new NextResponse(pdfBuffer as any, {
             headers: {
               "Content-Type": "application/pdf",
               "Content-Disposition": `attachment; filename="${proposal.id}.pdf"; filename*=UTF-8''${encodedBaseName}.pdf`,

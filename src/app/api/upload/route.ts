@@ -4,6 +4,7 @@ import { isMockMode, getTenantId } from "@/lib/config";
 import { extractTextFromFile, checkExtractionQuality, splitTextIntoChunks } from "@/lib/extractor";
 import { getEmbedding } from "@/lib/embeddings";
 import { Proposal } from "@/types";
+import { extractTemplateMetadata } from "@/lib/template_extractor";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,17 @@ export async function POST(req: NextRequest) {
       // We will allow continuing in mock mode or dev fallback, but strictly handle it.
     }
 
+    // 5b. Extract PPTX template metadata if applicable
+    let templateMetadata: any = null;
+    const isPptx = file.name.endsWith(".pptx");
+    if (isPptx) {
+      try {
+        templateMetadata = await extractTemplateMetadata(extractedText, file.name);
+      } catch (err) {
+        console.error("Failed to extract PPTX template metadata:", err);
+      }
+    }
+
     const isDbConnected = !isMockMode() && (await checkDbConnection());
 
     if (!isDbConnected) {
@@ -116,6 +128,7 @@ export async function POST(req: NextRequest) {
         embedding: embedding,
         created_at: new Date().toISOString(),
       };
+      (newProposal as any).template_metadata = templateMetadata;
       memoryStore.proposals.set(newProposal.id, newProposal);
 
       return NextResponse.json({
@@ -136,8 +149,8 @@ export async function POST(req: NextRequest) {
       
       // 1. Insert parent proposal record
       const sql = `
-        INSERT INTO proposals (tenant_id, rfp_title, training_type, sector, content_text, status, embedding, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7::vector, NOW())
+        INSERT INTO proposals (tenant_id, rfp_title, training_type, sector, content_text, status, embedding, template_metadata, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::vector, $8, NOW())
         RETURNING id
       `;
       // Format vector array for pg
@@ -150,6 +163,7 @@ export async function POST(req: NextRequest) {
         extractedText,
         status,
         vectorStr,
+        templateMetadata ? JSON.stringify(templateMetadata) : null,
       ]);
       const parentId = res.rows[0].id;
 

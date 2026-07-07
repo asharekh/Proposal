@@ -55,6 +55,9 @@ export interface RFPInput {
   deadline?: string | null;
   client_notes?: string | null;
   rfp_text?: string | null;
+  duration_days?: number | null;
+  delivery_mode?: string | null;
+  client_sector?: string | null;
 }
 
 export interface Phase {
