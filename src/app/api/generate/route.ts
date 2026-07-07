@@ -163,7 +163,24 @@ export async function POST(req: NextRequest) {
       });
 
       // 5. Build RAG Context
-      const ragContext = await buildRAGContext(similarProposals, tenantId);
+      let ragContext = await buildRAGContext(similarProposals, tenantId);
+
+      // 5b. Retrieve distilled client guidelines (Semantic facts)
+      let distilledGuidelines = "";
+      if (isDbConnected) {
+        const guidelineRow = await queryOne<{ guidelines: string }>(
+          tenantId,
+          "SELECT guidelines FROM tenant_client_guidelines WHERE tenant_id = $1 AND client_name = $2",
+          [tenantId, rfpData.client_name]
+        );
+        if (guidelineRow) {
+          distilledGuidelines = guidelineRow.guidelines;
+        }
+      }
+
+      if (distilledGuidelines) {
+        ragContext = `تفضيلات سابقة مع هذا العميل (${rfpData.client_name}):\n${distilledGuidelines}\n\n${ragContext}`;
+      }
 
       // 6. Generate proposal using Gemini
       const { content, compliance_score, compliance_checklist } = await generateProposal(

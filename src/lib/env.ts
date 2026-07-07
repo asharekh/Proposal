@@ -7,6 +7,9 @@ const envSchema = z.object({
   PUPPETEER_EXECUTABLE_PATH: z.string().optional(),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   MOCK_MODE: z.string().optional(),
+  LANGFUSE_PUBLIC_KEY: z.string().optional(),
+  LANGFUSE_SECRET_KEY: z.string().optional(),
+  LANGFUSE_HOST: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -26,6 +29,9 @@ export const getEnv = (): Env => {
     PUPPETEER_EXECUTABLE_PATH: process.env.PUPPETEER_EXECUTABLE_PATH,
     NODE_ENV: process.env.NODE_ENV || "development",
     MOCK_MODE: mockModeActive ? "true" : process.env.MOCK_MODE,
+    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
+    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
+    LANGFUSE_HOST: process.env.LANGFUSE_HOST,
   };
 
   const parsed = envSchema.safeParse(rawEnv);

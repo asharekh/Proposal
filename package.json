@@ -11,6 +11,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "docx": "^9.7.1",
+    "langfuse": "^3.38.20",
     "lucide-react": "^1.21.0",
     "mammoth": "^1.12.0",
     "next": "14.2.35",
@@ -20,6 +21,7 @@
     "puppeteer-core": "^24.43.1",
     "react": "^18",
     "react-dom": "^18",
+    "ssh2": "^1.17.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

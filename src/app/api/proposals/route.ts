@@ -4,6 +4,7 @@ import { isMockMode, getTenantId } from "@/lib/config";
 import { ProposalContent, GeneratedProposal } from "@/types";
 import { calculateCompliance } from "@/lib/generator";
 import { getEmbedding } from "@/lib/embeddings";
+import { distillClientGuidelines } from "@/lib/judge";
 
 export const dynamic = "force-dynamic";
 
@@ -218,6 +219,28 @@ export async function PATCH(req: NextRequest) {
     if (action === "mark_won" || action === "mark_lost") {
       const finalStatus = action === "mark_won" ? "won" : "lost";
       const compiledText = compileProposalText(proposal.draft_content);
+
+      // Trigger memory distillation if proposal is won
+      if (finalStatus === "won") {
+        try {
+          const guidelines = await distillClientGuidelines(proposal.rfp_data, proposal.draft_content);
+          if (!isDbConnected) {
+            console.log(`[Memory DB] Saved client guidelines for ${proposal.rfp_data.client_name}`);
+          } else {
+            await query(
+              tenantId,
+              `INSERT INTO tenant_client_guidelines (tenant_id, client_name, guidelines, updated_at)
+               VALUES ($1, $2, $3, NOW())
+               ON CONFLICT (tenant_id, client_name) 
+               DO UPDATE SET guidelines = EXCLUDED.guidelines, updated_at = NOW()`,
+              [tenantId, proposal.rfp_data.client_name, guidelines]
+            );
+            console.log(`[DB] Successfully distilled guidelines for client: ${proposal.rfp_data.client_name}`);
+          }
+        } catch (err) {
+          console.error("Failed to distill client guidelines during mark_won:", err);
+        }
+      }
 
       // Generate embedding vector so RAG matches future proposals using this learning
       let embedding: number[] = [];

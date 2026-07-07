@@ -2,6 +2,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getEnv } from "./env";
 import { isMockMode } from "./config";
 import { RFPInput, ProposalContent, ComplianceItem } from "../types";
+import { getLangfuse } from "./trace";
+import { auditProposalWithJudge } from "./judge";
 
 let genAI: GoogleGenerativeAI | null = null;
 
@@ -305,7 +307,7 @@ export const generateProposal = async (
   // If in mock mode, return mock content instantly
   if (isMockMode()) {
     if (rfp.other_requirements && rfp.other_requirements.includes("FAIL_GENERATION")) {
-      throw new Error("سيرفر الذكاء الاصطناعي غير متاح حالياً (خطأ تجريبي متعمد)");
+      throw new Error("سيرفر الذكاء اصطناعي غير متاح حالياً (خطأ تجريبي متعمد)");
     }
     console.log("[Generator] Running in MOCK mode. Generating mock proposal.");
     const mockContent = generateMockProposal(rfp, tenantName);
@@ -317,6 +319,17 @@ export const generateProposal = async (
     };
   }
 
+  // 1. Initialize Langfuse Trace
+  const langfuse = getLangfuse();
+  const trace = langfuse ? langfuse.trace({
+    name: "Generate Proposal",
+    metadata: {
+      client: rfp.client_name,
+      title: rfp.title,
+      type: rfp.proposal_type
+    }
+  }) : null;
+
   // Calculate duration in days for prompt context
   let durationDays = 5;
   if (rfp.start_date && rfp.end_date) {
@@ -326,7 +339,7 @@ export const generateProposal = async (
     if (diff > 0) durationDays = diff;
   }
 
-  const prompt = `
+  let prompt = `
 أنت خبير في كتابة العروض التدريبية الفنية والمالية للمعاهد التدريبية في المملكة العربية السعودية.
 اكتب باللغة العربية الفصحى الرسمية الاحترافية دائماً.
 مهم جداً: لا تخترع أرقاماً أو أسعاراً مالية أبداً — ضع قيم الأسعار والمجاميع كـ null ليقوم الموظف بإدخالها لاحقاً.
@@ -362,6 +375,11 @@ ${ragContext}
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+    const generationSpan = trace ? trace.span({
+      name: `Gemini Generation Run - Attempt ${attempt}`,
+      input: prompt
+    }) : null;
+
     try {
       console.log(`[Generator] Generation attempt ${attempt}/3 using Gemini API...`);
       const ai = getGenAI();
@@ -376,9 +394,11 @@ ${ragContext}
         },
       });
 
+      const startTime = Date.now();
       const result = await model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
       });
+      const responseTime = Date.now() - startTime;
 
       clearTimeout(timeoutId);
 
@@ -395,8 +415,48 @@ ${ragContext}
         throw new Error("Generated JSON misses key proposal sections");
       }
 
-      console.log("[Generator] Proposal generated successfully via Gemini!");
+      if (generationSpan) {
+        generationSpan.update({
+          output: jsonStr,
+          metadata: { latency_ms: responseTime }
+        });
+        generationSpan.end();
+      }
+
+      // 2. Perform LLM-as-a-Judge Evaluation Gating
+      console.log(`[Generator] Run evaluation judge audit check...`);
+      const auditResult = await auditProposalWithJudge(rfp, content);
+
+      if (!auditResult.passed && attempt < 3) {
+        console.warn(`[Generator] Audit check failed on attempt ${attempt}. Feedback: ${auditResult.issues.join(", ")}. Retrying with self-correction prompt.`);
+        
+        // Append self-correction feedback loop instruction to prompt
+        prompt += `
+\nتنبيه: محاولتك السابقة تحتوي على بعض الأخطاء ويجب تصحيحها في هذه النسخة الجديدة:
+${auditResult.issues.map((issue) => `- ${issue}`).join("\n")}
+        `;
+        
+        if (trace) {
+          trace.event({
+            name: "Evaluation Failure",
+            input: JSON.stringify(auditResult)
+          });
+        }
+        
+        // Wait 1 second before retrying
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+
+      console.log("[Generator] Proposal generated successfully via Gemini and passed Judge audit!");
       const compliance = calculateCompliance(rfp, content);
+
+      if (trace) {
+        trace.update({
+          output: JSON.stringify(content),
+          tags: ["success", auditResult.passed ? "passed-audit" : "failed-audit-fallback"]
+        });
+      }
 
       return {
         content,
@@ -407,6 +467,15 @@ ${ragContext}
       clearTimeout(timeoutId);
       lastError = error;
       console.warn(`[Generator] Attempt ${attempt} failed:`, error.message || error);
+      
+      if (generationSpan) {
+        generationSpan.update({
+          output: error.message || String(error),
+          level: "ERROR"
+        });
+        generationSpan.end();
+      }
+
       if (attempt < 3) {
         // Wait 1 second before retrying
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -415,6 +484,14 @@ ${ragContext}
   }
 
   console.error("[Generator] All 3 generation attempts failed. Falling back to Mock.", lastError);
+  
+  if (trace) {
+    trace.update({
+      output: lastError?.message || String(lastError),
+      tags: ["fallback"]
+    });
+  }
+
   // Fail-safe: Fallback to high-quality mock if real API calls fail in production/development
   const fallbackMock = generateMockProposal(rfp, tenantName);
   const compliance = calculateCompliance(rfp, fallbackMock);

@@ -21,6 +21,7 @@ conn.on('ready', () => {
     # 2. Run Database SQL Migration (pipe migration.sql into db container psql)
     echo "Running PostgreSQL database migration..."
     docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/migration.sql
+    docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/02_memory_schemas.sql
     
     # 3. Free up disk space from old dangling docker assets
     echo "Pruning unused Docker assets..."
