@@ -109,6 +109,47 @@ export const checkExtractionQuality = (
 };
 
 /**
+ * Extracts plain text from PowerPoint slide XMLs
+ */
+export const extractTextFromPptx = async (buffer: Buffer): Promise<string> => {
+  const JSZip = (await import("jszip")).default;
+  const zip = await JSZip.loadAsync(buffer);
+  const slideTexts: string[] = [];
+
+  // Find all slide files: ppt/slides/slide1.xml, ppt/slides/slide2.xml, etc.
+  const slideFiles = Object.keys(zip.files).filter(
+    (name) => name.startsWith("ppt/slides/slide") && name.endsWith(".xml")
+  );
+
+  // Sort files numerically by slide index to preserve narrative order
+  slideFiles.sort((a, b) => {
+    const numA = parseInt(a.replace(/[^0-9]/g, ""), 10);
+    const numB = parseInt(b.replace(/[^0-9]/g, ""), 10);
+    return numA - numB;
+  });
+
+  for (const filename of slideFiles) {
+    const file = zip.files[filename];
+    if (!file) continue;
+    const xmlText = await file.async("text");
+    
+    // Extract all text inside <a:t>...</a:t> tags
+    const matches = xmlText.match(/<a:t>([\s\S]*?)<\/a:t>/g);
+    if (matches) {
+      const slideText = matches
+        .map((m) => m.replace(/<\/?a:t>/g, ""))
+        .join(" ")
+        .trim();
+      if (slideText) {
+        slideTexts.push(slideText);
+      }
+    }
+  }
+
+  return slideTexts.join("\n\n");
+};
+
+/**
  * Extracts plain text from document buffer based on file name extension
  */
 export const extractTextFromFile = async (
@@ -134,11 +175,13 @@ export const extractTextFromFile = async (
     const mammoth = await import("mammoth");
     const result = await mammoth.extractRawText({ buffer });
     rawText = result.value || "";
+  } else if (ext === "pptx") {
+    rawText = await extractTextFromPptx(buffer);
   } else if (ext === "txt") {
     // Decode as UTF-8 plain text
     rawText = buffer.toString("utf-8");
   } else {
-    throw new Error("نوع الملف غير مدعوم. يرجى رفع ملف بصيغة (PDF, DOCX, TXT) فقط.");
+    throw new Error("نوع الملف غير مدعوم. يرجى رفع ملف بصيغة (PDF, DOCX, PPTX, TXT) فقط.");
   }
 
   // Clean and normalize

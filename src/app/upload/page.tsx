@@ -82,11 +82,11 @@ export default function UploadPage() {
   const addFiles = (files: File[]) => {
     const validFiles = files.filter(f => {
       const ext = f.name.split(".").pop()?.toLowerCase();
-      return ext === "pdf" || ext === "docx" || ext === "doc" || ext === "txt";
+      return ext === "pdf" || ext === "docx" || ext === "doc" || ext === "pptx" || ext === "txt";
     });
 
     if (validFiles.length < files.length) {
-      alert("يرجى رفع ملفات بصيغة PDF, DOCX, أو TXT فقط.");
+      alert("يرجى رفع ملفات بصيغة PDF, DOCX, PPTX أو TXT فقط.");
     }
 
     const newPending: PendingFile[] = validFiles.map((f) => ({
@@ -203,14 +203,14 @@ export default function UploadPage() {
           type="file" 
           id="file-upload-input" 
           multiple 
-          accept=".pdf,.docx,.doc,.txt"
+          accept=".pdf,.docx,.doc,.pptx,.txt"
           onChange={handleFileInput}
           className="hidden" 
         />
         <label htmlFor="file-upload-input" className="cursor-pointer">
           <Upload className="w-12 h-12 mx-auto text-gray-400 group-hover:text-green-600 mb-4 transition-colors" />
           <p className="font-bold text-gray-800 text-sm">اسحب الملفات وأفلتها هنا أو اضغط للتصفح</p>
-          <p className="text-xs text-gray-500 mt-2">الملفات المدعومة: PDF, DOCX, TXT (الحد الأقصى لحجم الملف: 20 ميجابايت)</p>
+          <p className="text-xs text-gray-500 mt-2">الملفات المدعومة: PDF, DOCX, PPTX, TXT (الحد الأقصى لحجم الملف: 20 ميجابايت)</p>
         </label>
       </div>
 
