@@ -16,7 +16,7 @@ conn.on('ready', () => {
     # 1. Force match origin/main exactly to pull latest code
     git fetch origin
     git reset --hard origin/main
-    git clean -fd
+    git clean -fxd
     
     # 2. Run Database SQL Migration (pipe migration.sql into db container psql)
     echo "Running PostgreSQL database migration..."
