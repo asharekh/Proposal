@@ -9,9 +9,10 @@ CREATE TABLE IF NOT EXISTS proposal_chunks (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. HNSW cosine index for pgvector semantic search (supersonic speed)
-CREATE INDEX IF NOT EXISTS proposal_chunks_embedding_cosine_idx 
-ON proposal_chunks USING hnsw (embedding vector_cosine_ops);
+-- 2. HNSW inner product index for pgvector semantic search (supersonic speed)
+DROP INDEX IF EXISTS proposal_chunks_embedding_cosine_idx;
+CREATE INDEX IF NOT EXISTS proposal_chunks_embedding_ip_idx 
+ON proposal_chunks USING hnsw (embedding vector_ip_ops);
 
 -- 3. Standard indexes for query filtering
 CREATE INDEX IF NOT EXISTS idx_proposal_chunks_tenant ON proposal_chunks(tenant_id);

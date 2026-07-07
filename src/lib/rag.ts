@@ -122,12 +122,12 @@ export const findSimilarProposals = async (
           p.sector, 
           c.content_text, 
           p.status,
-          (1 - (c.embedding <=> $1::vector)) as similarity
+          (- (c.embedding <#> $1::vector)) as similarity
         FROM proposal_chunks c
         JOIN proposals p ON c.proposal_id = p.id
         WHERE c.tenant_id = $2 
           AND ${conditions.join(" AND ")}
-          AND (1 - (c.embedding <=> $1::vector)) > 0.2
+          AND (- (c.embedding <#> $1::vector)) > 0.2
         ORDER BY similarity DESC 
         LIMIT $${limitParamIdx}
       `;
@@ -157,12 +157,12 @@ export const findSimilarProposals = async (
           p.sector, 
           c.content_text, 
           p.status,
-          (1 - (c.embedding <=> $1::vector)) as similarity
+          (- (c.embedding <#> $1::vector)) as similarity
         FROM proposal_chunks c
         JOIN proposals p ON c.proposal_id = p.id
         WHERE c.tenant_id = $2 
           ${excludeClause}
-          AND (1 - (c.embedding <=> $1::vector)) > 0.2
+          AND (- (c.embedding <#> $1::vector)) > 0.2
         ORDER BY similarity DESC 
         LIMIT $3
       `;
