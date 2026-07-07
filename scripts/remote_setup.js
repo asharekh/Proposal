@@ -29,7 +29,7 @@ conn.on('ready', () => {
     
     # 4. Build and restart Next.js app container
     export GEMINI_API_KEY="${geminiKey}"
-    docker-compose build --no-cache app
+    docker-compose build app
     
     echo "Removing old container to prevent docker-compose KeyError..."
     docker rm -f proposal_engine_app || true
