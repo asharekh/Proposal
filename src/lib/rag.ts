@@ -9,7 +9,8 @@ import { isMockMode } from "./config";
 export const findSimilarProposals = async (
   tenantId: string,
   rfpText: string,
-  limit: number = 5
+  limit: number = 5,
+  filters?: { sector?: string; trainingType?: string }
 ): Promise<SimilarProposal[]> => {
   // Check count of references first (handles cold start gracefully)
   const isDbAvailable = !isMockMode() && (await checkDbConnection());
@@ -17,13 +18,28 @@ export const findSimilarProposals = async (
   if (!isDbAvailable) {
     // Mock memory vector search using dot-product or simple matching
     console.log(`[Mock Vector Search] Tenant: ${tenantId} | Query: "${rfpText.substring(0, 50)}..."`);
-    const mockRefProposals = Array.from(memoryStore.proposals.values()).filter(
+    let mockRefProposals = Array.from(memoryStore.proposals.values()).filter(
       (p) => p.tenant_id === tenantId
     );
 
     if (mockRefProposals.length === 0) {
       console.log("[Mock Vector Search] Cold start: no proposals found.");
       return [];
+    }
+
+    // Apply hybrid filtering preferences in mock mode
+    if (filters) {
+      let filtered = mockRefProposals;
+      if (filters.sector) {
+        filtered = filtered.filter((p) => p.sector === filters.sector);
+      }
+      if (filters.trainingType) {
+        filtered = filtered.filter((p) => p.training_type === filters.trainingType);
+      }
+      // If we got matches, use them. Otherwise, fall back to unfiltered to prevent empty results.
+      if (filtered.length > 0) {
+        mockRefProposals = filtered;
+      }
     }
 
     // Since we don't have a real vector engine in memory, we rank by simple text overlap or return them
@@ -74,29 +90,88 @@ export const findSimilarProposals = async (
 
     // 2. Generate search vector
     const vector = await getEmbedding(rfpText);
-
-    // 3. Cosine similarity query over semantic chunks
-    const sql = `
-      SELECT 
-        c.id, 
-        p.rfp_title, 
-        p.training_type, 
-        p.sector, 
-        c.content_text, 
-        p.status,
-        (1 - (c.embedding <=> $1::vector)) as similarity
-      FROM proposal_chunks c
-      JOIN proposals p ON c.proposal_id = p.id
-      WHERE c.tenant_id = $2 AND (1 - (c.embedding <=> $1::vector)) > 0.2
-      ORDER BY similarity DESC 
-      LIMIT $3
-    `;
-
-    // Stringify vector for pg pgvector input
     const vectorStr = `[${vector.join(",")}]`;
-    const results = await query<SimilarProposal>(tenantId, sql, [vectorStr, tenantId, limit]);
-    
-    console.log(`[DB Vector Search] Found ${results.length} semantic chunks with similarity > 0.2.`);
+
+    let results: SimilarProposal[] = [];
+
+    // 3. Try sector/training_type specific search first (if filters are provided)
+    if (filters && (filters.sector || filters.trainingType)) {
+      const conditions: string[] = [];
+      const params: any[] = [vectorStr, tenantId];
+      let paramCount = 3;
+
+      if (filters.sector) {
+        conditions.push(`p.sector = $${paramCount}`);
+        params.push(filters.sector);
+        paramCount++;
+      }
+      if (filters.trainingType) {
+        conditions.push(`p.training_type = $${paramCount}`);
+        params.push(filters.trainingType);
+        paramCount++;
+      }
+
+      params.push(limit);
+      const limitParamIdx = paramCount;
+
+      const sql = `
+        SELECT 
+          c.id, 
+          p.rfp_title, 
+          p.training_type, 
+          p.sector, 
+          c.content_text, 
+          p.status,
+          (1 - (c.embedding <=> $1::vector)) as similarity
+        FROM proposal_chunks c
+        JOIN proposals p ON c.proposal_id = p.id
+        WHERE c.tenant_id = $2 
+          AND ${conditions.join(" AND ")}
+          AND (1 - (c.embedding <=> $1::vector)) > 0.2
+        ORDER BY similarity DESC 
+        LIMIT $${limitParamIdx}
+      `;
+      
+      results = await query<SimilarProposal>(tenantId, sql, params);
+      console.log(`[DB Vector Search] Found ${results.length} metadata-matching semantic chunks.`);
+    }
+
+    // 4. Fallback search (if results count is less than the limit)
+    if (results.length < limit) {
+      const remainingLimit = limit - results.length;
+      
+      // Exclude already retrieved chunk IDs
+      let excludeClause = "";
+      const params: any[] = [vectorStr, tenantId, remainingLimit];
+      if (results.length > 0) {
+        const idList = results.map((r, i) => `$${i + 4}`).join(",");
+        excludeClause = `AND c.id NOT IN (${idList})`;
+        results.forEach(r => params.push(r.id));
+      }
+
+      const sql = `
+        SELECT 
+          c.id, 
+          p.rfp_title, 
+          p.training_type, 
+          p.sector, 
+          c.content_text, 
+          p.status,
+          (1 - (c.embedding <=> $1::vector)) as similarity
+        FROM proposal_chunks c
+        JOIN proposals p ON c.proposal_id = p.id
+        WHERE c.tenant_id = $2 
+          ${excludeClause}
+          AND (1 - (c.embedding <=> $1::vector)) > 0.2
+        ORDER BY similarity DESC 
+        LIMIT $3
+      `;
+      
+      const fallbackResults = await query<SimilarProposal>(tenantId, sql, params);
+      results = [...results, ...fallbackResults];
+      console.log(`[DB Vector Search] Combined retrieved chunks count: ${results.length}.`);
+    }
+
     return results;
   } catch (error) {
     console.error("Vector search failed on DB:", error);

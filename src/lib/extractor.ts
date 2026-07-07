@@ -173,18 +173,25 @@ export const splitTextIntoChunks = (
       // Look for paragraph or sentence boundaries
       let boundaryIdx = -1;
       
-      // Try paragraph boundary first
-      boundaryIdx = boundarySub.lastIndexOf("\n");
-      // If not found, try sentence boundaries
-      if (boundaryIdx === -1) {
-        boundaryIdx = Math.max(
-          boundarySub.lastIndexOf("."),
-          boundarySub.lastIndexOf("!")
-        );
-      }
-      // If still not found, try space
-      if (boundaryIdx === -1) {
-        boundaryIdx = boundarySub.lastIndexOf(" ");
+      // If the block contains markdown table separators "|", split STRICTLY on newline boundaries 
+      // to keep table rows complete and avoid split syntax anomalies.
+      const hasTableDelimiter = boundarySub.includes("|");
+      if (hasTableDelimiter) {
+        boundaryIdx = boundarySub.lastIndexOf("\n");
+      } else {
+        // Try paragraph boundary first
+        boundaryIdx = boundarySub.lastIndexOf("\n");
+        // If not found, try sentence boundaries
+        if (boundaryIdx === -1) {
+          boundaryIdx = Math.max(
+            boundarySub.lastIndexOf("."),
+            boundarySub.lastIndexOf("!")
+          );
+        }
+        // If still not found, try space
+        if (boundaryIdx === -1) {
+          boundaryIdx = boundarySub.lastIndexOf(" ");
+        }
       }
       
       if (boundaryIdx !== -1) {

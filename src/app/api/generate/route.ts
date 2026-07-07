@@ -157,7 +157,10 @@ export async function POST(req: NextRequest) {
       const searchString = rfpData.rfp_text || 
         `برنامج تدريبي بعنوان ${rfpData.title} في فئة ${rfpData.category || ""}. نوع التدريب: ${rfpData.training_type}. متطلبات أخرى: ${rfpData.other_requirements || ""}`;
       
-      const similarProposals = await findSimilarProposals(tenantId, searchString, 5);
+      const similarProposals = await findSimilarProposals(tenantId, searchString, 5, {
+        sector: rfpData.category || undefined,
+        trainingType: rfpData.training_type || undefined
+      });
 
       // 5. Build RAG Context
       const ragContext = await buildRAGContext(similarProposals, tenantId);
