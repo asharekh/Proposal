@@ -44,7 +44,7 @@ conn.on('ready', () => {
     echo "Running backfill segment migration..."
     docker exec -i proposal_engine_app node migrate_existing.js
     echo "Cleaning up temp files..."
-    docker exec -i proposal_engine_app rm -f migrate_existing.js
+    docker exec -u root -i proposal_engine_app rm -f migrate_existing.js
   `;
 
   console.log('Starting remote build, database migration, and container recreation...');
