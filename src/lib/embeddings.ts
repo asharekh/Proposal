@@ -30,8 +30,13 @@ export const getEmbedding = async (
     contentToEmbed = parts.join("\n");
   }
 
-  // 2. Truncate to 8000 chars max
-  contentToEmbed = contentToEmbed.substring(0, 8000);
+  // 2. Truncate based on estimated token budget of ~2000 tokens (text-embedding-004 limit)
+  const estimatedTokens = Math.ceil(contentToEmbed.length / 2.2);
+  if (estimatedTokens > 2000) {
+    const maxChars = Math.floor(2000 * 2.2);
+    console.warn(`[Embeddings] Truncating content to stay under 2000 estimated tokens. Original estimate: ${estimatedTokens} tokens, truncated estimate: 2000 tokens.`);
+    contentToEmbed = contentToEmbed.substring(0, maxChars);
+  }
 
   // 3. Fallback mock embedding if mock mode is active
   if (isMockMode()) {

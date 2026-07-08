@@ -27,6 +27,14 @@ const templateResponseSchema = {
       },
       required: ["primary", "secondary", "bg_dark", "bg_light", "text_dark", "text_light"]
     },
+    fonts: {
+      type: "OBJECT",
+      properties: {
+        heading: { type: "STRING", description: "Font family suggested for headings/titles" },
+        body: { type: "STRING", description: "Font family suggested for body text" }
+      },
+      required: ["heading", "body"]
+    },
     slide_structure: {
       type: "ARRAY",
       items: {
@@ -40,7 +48,7 @@ const templateResponseSchema = {
       }
     }
   },
-  required: ["colors", "slide_structure"]
+  required: ["colors", "fonts", "slide_structure"]
 };
 
 export interface TemplateMetadata {
@@ -51,6 +59,10 @@ export interface TemplateMetadata {
     bg_light: string;
     text_dark: string;
     text_light: string;
+  };
+  fonts: {
+    heading: string;
+    body: string;
   };
   slide_structure: {
     slide_number: number;
@@ -77,6 +89,10 @@ export const extractTemplateMetadata = async (
         text_dark: "#1F2937",
         text_light: "#FFFFFF"
       },
+      fonts: {
+        heading: "Arial",
+        body: "Arial"
+      },
       slide_structure: [
         { slide_number: 1, title: "Cover Slide", layout_type: "cover" },
         { slide_number: 2, title: "الملخص التنفيذي", layout_type: "text" },
@@ -88,16 +104,25 @@ export const extractTemplateMetadata = async (
     };
   }
 
+  let textToAnalyze = rawText;
+  const estimatedTokens = Math.ceil(textToAnalyze.length / 2.2);
+  if (estimatedTokens > 4500) {
+    const maxChars = Math.floor(4500 * 2.2);
+    console.warn(`[TemplateExtractor] Truncating reference text for analysis to stay under 4500 estimated tokens. Original estimate: ${estimatedTokens} tokens, truncated estimate: 4500 tokens.`);
+    textToAnalyze = textToAnalyze.substring(0, maxChars);
+  }
+
   const prompt = `
 قم بتحليل النص التالي المستخرج من عرض تقديمي تدريبي (PowerPoint). 
 حدد الهيكل البنيوي والنمط البصري المقترح للعرض:
 1. استنتج ألوان الهوية المناسبة استناداً إلى اسم الجهة أو نوع قطاع التدريب (على سبيل المثال: إذا كانت أرامكو، فاللون أخضر/أزرق بترولي. إذا كانت وزارة الطاقة، فالأخضر الرسمي. إذا كان تدريب قادة تنفيذي، فذهبى وكحلي).
-2. استخلص قائمة بأسماء وتتابع العناوين الرئيسية لكل شريحة ونوع التخطيط الأنسب لها (مثل: cover, text, phases, timeline, financials, closing).
+2. اقترح خطوطاً (Fonts) مناسبة للعناوين والنصوص استناداً لدرجة الرسمية والقطاع (افتراضياً اقترح خطوطاً شائعة تدعم العربية مثل Arial أو Calibri).
+3. استخلص قائمة بأسماء وتتابع العناوين الرئيسية لكل شريحة ونوع التخطيط الأنسب لها (مثل: cover, text, phases, timeline, financials, closing).
 
 اسم الملف: ${filename}
 
 نص العرض التقديمي المرجعي:
-${rawText.substring(0, 10000)}
+${textToAnalyze}
 
 أجب بصيغة JSON تطابق المخطط الهيكلي المحدد بدقة.
   `;
@@ -136,6 +161,10 @@ ${rawText.substring(0, 10000)}
         bg_light: "#FFFFFF",
         text_dark: "#1F2937",
         text_light: "#FFFFFF"
+      },
+      fonts: {
+        heading: "Arial",
+        body: "Arial"
       },
       slide_structure: [
         { slide_number: 1, title: "Cover Slide", layout_type: "cover" },

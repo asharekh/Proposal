@@ -403,247 +403,300 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant, t
 
   const fontFace = templateMetadata?.fonts?.body || "Arial";
 
-  // Slide 1: Cover Slide
-  const slide1 = pptx.addSlide();
-  slide1.background = { color: cBgDark };
-  
-  slide1.addShape("rect", {
-    x: 0,
-    y: 0,
-    w: 13.33,
-    h: 0.5,
-    fill: { color: cPrimary },
-  } as any);
-
-  // Client target banner
-  slide1.addText(tenant.name, {
-    x: 1.0,
-    y: 1.5,
-    w: 8.0,
-    h: 0.5,
-    fontSize: 24,
-    color: cPrimary,
-    bold: true,
-    fontFace,
-    align: "right",
-    rtl: true,
-  } as any);
-
-  slide1.addText(rfp.title, {
-    x: 1.0,
-    y: 2.2,
-    w: 8.0,
-    h: 1.2,
-    fontSize: 36,
-    color: cTextLight,
-    bold: true,
-    fontFace,
-    align: "right",
-    rtl: true,
-  } as any);
-
-  slide1.addText(`عرض فني ومالي لشركة: ${rfp.client_name}`, {
-    x: 1.0,
-    y: 3.5,
-    w: 8.0,
-    h: 0.5,
-    fontSize: 20,
-    color: "9CA3AF",
-    fontFace,
-    align: "right",
-    rtl: true,
-  } as any);
-
-  // Slide 2: Executive Summary
-  const slide2 = pptx.addSlide();
-  slide2.background = { color: cBgLight };
-  slide2.addText("1. الملخص التنفيذي", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
-  slide2.addText(content.executive_summary, { x: 0.5, y: 1.3, w: 9.0, h: 4.5, fontSize: 16, color: cTextDark, fontFace, align: "right", rtl: true } as any);
-
-  // Slide 3: Methodology Overview
-  const slide3 = pptx.addSlide();
-  slide3.background = { color: cBgLight };
-  slide3.addText("2. المنهجية والأسلوب التدريبي", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
-  slide3.addText(content.methodology?.approach || "", { x: 0.5, y: 1.2, w: 9.0, h: 1.5, fontSize: 15, color: cTextDark, fontFace, align: "right", rtl: true } as any);
-
-  // Phase boxes
-  (content.methodology?.phases || []).forEach((p, idx) => {
-    if (idx >= 3) return; // Cap at 3 phases for slide formatting
-    const boxX = 6.8 - idx * 3.1;
+  // Render cover slide
+  const renderCoverSlide = () => {
+    const slide = pptx.addSlide();
+    slide.background = { color: cBgDark };
     
-    // Header shape
-    slide3.addShape("roundRect", {
-      x: boxX,
-      y: 3.0,
-      w: 2.8,
-      h: 2.5,
-      fill: { color: "F3F4F6" },
-      line: { color: "E5E7EB", width: 1 },
+    slide.addShape("rect", {
+      x: 0,
+      y: 0,
+      w: 13.33,
+      h: 0.5,
+      fill: { color: cPrimary },
     } as any);
 
-    slide3.addText(`المرحلة ${p.number}\n${p.title}`, {
-      x: boxX,
-      y: 3.1,
-      w: 2.8,
-      h: 0.6,
-      fontSize: 14,
-      bold: true,
+    slide.addText(tenant.name, {
+      x: 1.0,
+      y: 1.5,
+      w: 8.0,
+      h: 0.5,
+      fontSize: 24,
       color: cPrimary,
-      fontFace,
-      align: "center",
-      rtl: true,
-    } as any);
-
-    slide3.addText(p.description.substring(0, 150), {
-      x: boxX + 0.1,
-      y: 3.8,
-      w: 2.6,
-      h: 1.6,
-      fontSize: 11,
-      color: cTextDark,
+      bold: true,
       fontFace,
       align: "right",
       rtl: true,
     } as any);
-  });
 
-  // Slide 4: One slide per phase (details)
-  (content.methodology?.phases || []).forEach((p) => {
-    const slidePhase = pptx.addSlide();
-    slidePhase.background = { color: cBgLight };
-    slidePhase.addText(`مرحلة التدريب ${p.number}: ${p.title}`, { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
-    slidePhase.addText(`المدة المقررة: ${p.duration}`, { x: 0.5, y: 1.1, w: 9.0, h: 0.4, fontSize: 16, color: "6B7280", fontFace, align: "right", rtl: true } as any);
-    
-    slidePhase.addText(p.description, { x: 0.5, y: 1.6, w: 9.0, h: 1.2, fontSize: 15, color: cTextDark, fontFace, align: "right", rtl: true } as any);
+    slide.addText(rfp.title, {
+      x: 1.0,
+      y: 2.2,
+      w: 8.0,
+      h: 1.2,
+      fontSize: 36,
+      color: cTextLight,
+      bold: true,
+      fontFace,
+      align: "right",
+      rtl: true,
+    } as any);
 
-    // Objectives list
-    slidePhase.addText("أهداف ومخرجات المرحلة الأساسية:", { x: 0.5, y: 2.9, w: 9.0, h: 0.4, fontSize: 16, bold: true, color: cSecondary, fontFace, align: "right", rtl: true } as any);
-    
-    const objText = p.objectives.map((obj) => `• ${obj}`).join("\n\n");
-    slidePhase.addText(objText, { x: 0.5, y: 3.4, w: 9.0, h: 2.2, fontSize: 14, color: cTextDark, fontFace, align: "right", rtl: true } as any);
-  });
+    slide.addText(`عرض فني ومالي لشركة: ${rfp.client_name}`, {
+      x: 1.0,
+      y: 3.5,
+      w: 8.0,
+      h: 0.5,
+      fontSize: 20,
+      color: "9CA3AF",
+      fontFace,
+      align: "right",
+      rtl: true,
+    } as any);
+  };
 
-  // Slide 5: Timeline
-  const slide5 = pptx.addSlide();
-  slide5.background = { color: cBgLight };
-  slide5.addText("3. الجدول الزمني وتوزيع الأيام", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+  // Render text slide (e.g. executive summary, about institute)
+  const renderTextSlide = (title: string, textVal: string) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: cBgLight };
+    slide.addText(title, { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+    slide.addText(textVal, { x: 0.5, y: 1.3, w: 9.0, h: 4.5, fontSize: 16, color: cTextDark, fontFace, align: "right", rtl: true } as any);
+  };
 
-  const timelineRows: any[] = [
-    [
-      { text: "النشاط التدريبي والمحاور المغطاة", options: { bold: true, fill: cPrimary, color: cTextLight } },
-      { text: "اليوم / الفترة", options: { bold: true, fill: cPrimary, color: cTextLight, align: "center" } }
-    ]
-  ];
+  // Render methodology phases overview slide
+  const renderPhasesSlide = (title: string) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: cBgLight };
+    slide.addText(title, { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+    slide.addText(content.methodology?.approach || "", { x: 0.5, y: 1.2, w: 9.0, h: 1.5, fontSize: 15, color: cTextDark, fontFace, align: "right", rtl: true } as any);
 
-  (content.timeline || []).forEach((t) => {
-    timelineRows.push([
-      { text: t.activity, options: { align: "right" } },
-      { text: t.week, options: { align: "center" } }
-    ]);
-  });
+    (content.methodology?.phases || []).forEach((p, idx) => {
+      if (idx >= 3) return; // Cap at 3 phases for slide formatting
+      const boxX = 6.8 - idx * 3.1;
+      
+      slide.addShape("roundRect", {
+        x: boxX,
+        y: 3.0,
+        w: 2.8,
+        h: 2.5,
+        fill: { color: "F3F4F6" },
+        line: { color: "E5E7EB", width: 1 },
+      } as any);
 
-  slide5.addTable(timelineRows, {
-    x: 0.5,
-    y: 1.3,
-    w: 9.0,
-    colW: [7.0, 2.0],
-    border: { color: "E5E7EB", width: 1 },
-    fontSize: 12,
-    fontFace,
-  } as any);
-
-  // Slide 6: Financial Offer (if applicable)
-  if (rfp.proposal_type !== "technical" && content.financial) {
-    const slide6 = pptx.addSlide();
-    slide6.background = { color: cBgLight };
-    slide6.addText("4. العرض المالي والرسوم المقترحة", { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
-
-    const isAnyPriceNull = content.financial.breakdown.some((b) => b.unit_price === null);
-
-    if (isAnyPriceNull) {
-      slide6.addText("⚠ تنبيه: الأسعار والمجاميع المالية لم يتم تحديدها بعد وتتطلب مراجعة.", {
-        x: 0.5,
-        y: 1.1,
-        w: 9.0,
-        h: 0.4,
+      slide.addText(`المرحلة ${p.number}\n${p.title}`, {
+        x: boxX,
+        y: 3.1,
+        w: 2.8,
+        h: 0.6,
         fontSize: 14,
         bold: true,
-        color: "D97706",
+        color: cPrimary,
+        fontFace,
+        align: "center",
+        rtl: true,
+      } as any);
+
+      slide.addText(p.description.substring(0, 150), {
+        x: boxX + 0.1,
+        y: 3.8,
+        w: 2.6,
+        h: 1.6,
+        fontSize: 11,
+        color: cTextDark,
+        fontFace,
+        align: "right",
+        rtl: true,
+      } as any);
+    });
+  };
+
+  // Render per-phase detailed slides
+  const renderPhaseDetailsSlides = () => {
+    (content.methodology?.phases || []).forEach((p) => {
+      const slide = pptx.addSlide();
+      slide.background = { color: cBgLight };
+      slide.addText(`مرحلة التدريب ${p.number}: ${p.title}`, { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+      slide.addText(`المدة المقررة: ${p.duration}`, { x: 0.5, y: 1.1, w: 9.0, h: 0.4, fontSize: 16, color: "6B7280", fontFace, align: "right", rtl: true } as any);
+      
+      slide.addText(p.description, { x: 0.5, y: 1.6, w: 9.0, h: 1.2, fontSize: 15, color: cTextDark, fontFace, align: "right", rtl: true } as any);
+
+      // Objectives list
+      slide.addText("أهداف ومخرجات المرحلة الأساسية:", { x: 0.5, y: 2.9, w: 9.0, h: 0.4, fontSize: 16, bold: true, color: cSecondary, fontFace, align: "right", rtl: true } as any);
+      
+      const objText = p.objectives.map((obj) => `• ${obj}`).join("\n\n");
+      slide.addText(objText, { x: 0.5, y: 3.4, w: 9.0, h: 2.2, fontSize: 14, color: cTextDark, fontFace, align: "right", rtl: true } as any);
+    });
+  };
+
+  // Render timeline slide
+  const renderTimelineSlide = (title: string) => {
+    const slide = pptx.addSlide();
+    slide.background = { color: cBgLight };
+    slide.addText(title, { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+
+    const timelineRows: any[] = [
+      [
+        { text: "النشاط التدريبي والمحاور المغطاة", options: { bold: true, fill: cPrimary, color: cTextLight } },
+        { text: "اليوم / الفترة", options: { bold: true, fill: cPrimary, color: cTextLight, align: "center" } }
+      ]
+    ];
+
+    (content.timeline || []).forEach((t) => {
+      timelineRows.push([
+        { text: t.activity, options: { align: "right" } },
+        { text: t.week, options: { align: "center" } }
+      ]);
+    });
+
+    slide.addTable(timelineRows, {
+      x: 0.5,
+      y: 1.3,
+      w: 9.0,
+      colW: [7.0, 2.0],
+      border: { color: "E5E7EB", width: 1 },
+      fontSize: 12,
+      fontFace,
+    } as any);
+  };
+
+  // Render financials slide
+  const renderFinancialsSlide = (title: string) => {
+    if (rfp.proposal_type !== "technical" && content.financial) {
+      const slide = pptx.addSlide();
+      slide.background = { color: cBgLight };
+      slide.addText(title, { x: 0.5, y: 0.5, w: 9.0, h: 0.6, fontSize: 24, color: cPrimary, bold: true, fontFace, align: "right", rtl: true } as any);
+
+      const isAnyPriceNull = content.financial.breakdown.some((b) => b.unit_price === null);
+
+      if (isAnyPriceNull) {
+        slide.addText("⚠ تنبيه: الأسعار والمجاميع المالية لم يتم تحديدها بعد وتتطلب مراجعة.", {
+          x: 0.5,
+          y: 1.1,
+          w: 9.0,
+          h: 0.4,
+          fontSize: 14,
+          bold: true,
+          color: "D97706",
+          fontFace,
+          align: "right",
+          rtl: true,
+        } as any);
+      }
+
+      const financialRows: any[] = [
+        [
+          { text: "المجموع الكلي (ريال)", options: { bold: true, fill: cPrimary, color: cTextLight } },
+          { text: "سعر الوحدة (ريال)", options: { bold: true, fill: cPrimary, color: cTextLight } },
+          { text: "الكمية", options: { bold: true, fill: cPrimary, color: cTextLight } },
+          { text: "الخدمة / البند التدريبي", options: { bold: true, fill: cPrimary, color: cTextLight } }
+        ]
+      ];
+
+      content.financial.breakdown.forEach((item) => {
+        financialRows.push([
+          { text: item.total !== null ? `${item.total}` : "يحدد لاحقاً", options: { align: "center" } },
+          { text: item.unit_price !== null ? `${item.unit_price}` : "يحدد لاحقاً", options: { align: "center" } },
+          { text: `${item.quantity}`, options: { align: "center" } },
+          { text: item.item, options: { align: "right" } }
+        ]);
+      });
+
+      slide.addTable(financialRows, {
+        x: 0.5,
+        y: 1.6,
+        w: 9.0,
+        colW: [2.0, 2.0, 1.0, 4.0],
+        border: { color: "E5E7EB", width: 1 },
+        fontSize: 11,
+        fontFace,
+      } as any);
+
+      slide.addText(`شروط السداد: ${content.financial.payment_terms}`, {
+        x: 0.5,
+        y: 4.8,
+        w: 9.0,
+        h: 0.8,
+        fontSize: 12,
+        color: cTextDark,
         fontFace,
         align: "right",
         rtl: true,
       } as any);
     }
+  };
 
-    const financialRows: any[] = [
-      [
-        { text: "المجموع الكلي (ريال)", options: { bold: true, fill: cPrimary, color: cTextLight } },
-        { text: "سعر الوحدة (ريال)", options: { bold: true, fill: cPrimary, color: cTextLight } },
-        { text: "الكمية", options: { bold: true, fill: cPrimary, color: cTextLight } },
-        { text: "الخدمة / البند التدريبي", options: { bold: true, fill: cPrimary, color: cTextLight } }
-      ]
-    ];
-
-    content.financial.breakdown.forEach((item) => {
-      financialRows.push([
-        { text: item.total !== null ? `${item.total}` : "يحدد لاحقاً", options: { align: "center" } },
-        { text: item.unit_price !== null ? `${item.unit_price}` : "يحدد لاحقاً", options: { align: "center" } },
-        { text: `${item.quantity}`, options: { align: "center" } },
-        { text: item.item, options: { align: "right" } }
-      ]);
-    });
-
-    slide6.addTable(financialRows, {
-      x: 0.5,
-      y: 1.6,
-      w: 9.0,
-      colW: [2.0, 2.0, 1.0, 4.0],
-      border: { color: "E5E7EB", width: 1 },
-      fontSize: 11,
-      fontFace,
-    } as any);
-
-    slide6.addText(`شروط السداد: ${content.financial.payment_terms}`, {
-      x: 0.5,
-      y: 4.8,
-      w: 9.0,
+  // Render closing slide
+  const renderClosingSlide = () => {
+    const slide = pptx.addSlide();
+    slide.background = { color: cBgDark };
+    
+    slide.addText("نشكر لكم اهتمامكم وثقتكم", {
+      x: 1.0,
+      y: 2.0,
+      w: 8.0,
       h: 0.8,
-      fontSize: 12,
-      color: cTextDark,
+      fontSize: 32,
+      color: cPrimary,
+      bold: true,
       fontFace,
-      align: "right",
+      align: "center",
       rtl: true,
     } as any);
+
+    slide.addText(`معهد التدريب: ${tenant.name}\nالهاتف: ${tenant.phone || ""}\nالبريد الإلكتروني: ${tenant.email || ""}\nالعنوان: ${tenant.address || ""}`, {
+      x: 1.0,
+      y: 3.0,
+      w: 8.0,
+      h: 1.8,
+      fontSize: 16,
+      color: cTextLight,
+      fontFace,
+      align: "center",
+      rtl: true,
+    } as any);
+  };
+
+  // Execute sequence according to reference slide structure if available
+  const structure = templateMetadata?.slide_structure;
+  if (structure && Array.isArray(structure) && structure.length > 0) {
+    let textCount = 0;
+    structure.forEach((entry: any) => {
+      const type = entry.layout_type;
+      const title = entry.title || "";
+      if (type === "cover") {
+        renderCoverSlide();
+      } else if (type === "text") {
+        let textVal = "";
+        if (textCount === 0) {
+          textVal = content.executive_summary;
+        } else if (textCount === 1) {
+          textVal = content.about_institute || "";
+        } else {
+          textVal = content.methodology?.approach || "";
+        }
+        textCount++;
+        renderTextSlide(title, textVal);
+      } else if (type === "phases") {
+        renderPhasesSlide(title);
+        renderPhaseDetailsSlides();
+      } else if (type === "timeline") {
+        renderTimelineSlide(title);
+      } else if (type === "financials") {
+        renderFinancialsSlide(title);
+      } else if (type === "closing") {
+        renderClosingSlide();
+      }
+    });
+  } else {
+    // Fall back to original hardcoded slide sequence
+    renderCoverSlide();
+    renderTextSlide("1. الملخص التنفيذي", content.executive_summary);
+    renderPhasesSlide("2. المنهجية والأسلوب التدريبي");
+    renderPhaseDetailsSlides();
+    renderTimelineSlide("3. الجدول الزمني وتوزيع الأيام");
+    renderFinancialsSlide("4. العرض المالي والرسوم المقترحة");
+    renderClosingSlide();
   }
-
-  // Slide 7: Closing slide
-  const slide7 = pptx.addSlide();
-  slide7.background = { color: cBgDark };
-  
-  slide7.addText("نشكر لكم اهتمامكم وثقتكم", {
-    x: 1.0,
-    y: 2.0,
-    w: 8.0,
-    h: 0.8,
-    fontSize: 32,
-    color: cPrimary,
-    bold: true,
-    fontFace,
-    align: "center",
-    rtl: true,
-  } as any);
-
-  slide7.addText(`معهد التدريب: ${tenant.name}\nالهاتف: ${tenant.phone || ""}\nالبريد الإلكتروني: ${tenant.email || ""}\nالعنوان: ${tenant.address || ""}`, {
-    x: 1.0,
-    y: 3.0,
-    w: 8.0,
-    h: 1.8,
-    fontSize: 16,
-    color: cTextLight,
-    fontFace,
-    align: "center",
-    rtl: true,
-  } as any);
 
   return pptx.write({ outputType: "nodebuffer" }) as Promise<Buffer>;
 }

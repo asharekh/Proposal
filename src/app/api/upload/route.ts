@@ -89,20 +89,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: qualityResult.message }, { status: 400 });
     }
 
-    // 5. Generate embeddings
-    let embedding: number[] = [];
-    try {
-      embedding = await getEmbedding(extractedText, {
-        title: rfpTitle,
-        trainingType: trainingType || undefined,
-        sector: sector || undefined,
-      });
-    } catch (err: any) {
-      console.error("Failed to generate embedding during upload:", err);
-      // We will allow continuing in mock mode or dev fallback, but strictly handle it.
-    }
-
-    // 5b. Extract PPTX template metadata if applicable
+    // 5. Extract PPTX template metadata if applicable
     let templateMetadata: any = null;
     const isPptx = file.name.endsWith(".pptx");
     if (isPptx) {
@@ -116,6 +103,18 @@ export async function POST(req: NextRequest) {
     const isDbConnected = !isMockMode() && (await checkDbConnection());
 
     if (!isDbConnected) {
+      // Generate embedding specifically for mock-mode in-memory proposals
+      let mockEmbedding: number[] = [];
+      try {
+        mockEmbedding = await getEmbedding(extractedText, {
+          title: rfpTitle,
+          trainingType: trainingType || undefined,
+          sector: sector || undefined,
+        });
+      } catch (err: any) {
+        console.error("Failed to generate embedding during mock upload:", err);
+      }
+
       // Save to memory store
       const newProposal: Proposal = {
         id: crypto.randomUUID(),
@@ -125,7 +124,7 @@ export async function POST(req: NextRequest) {
         sector: sector,
         content_text: extractedText,
         status: status as any,
-        embedding: embedding,
+        embedding: mockEmbedding,
         created_at: new Date().toISOString(),
       };
       (newProposal as any).template_metadata = templateMetadata;
@@ -149,12 +148,10 @@ export async function POST(req: NextRequest) {
       
       // 1. Insert parent proposal record
       const sql = `
-        INSERT INTO proposals (tenant_id, rfp_title, training_type, sector, content_text, status, embedding, template_metadata, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7::vector, $8, NOW())
+        INSERT INTO proposals (tenant_id, rfp_title, training_type, sector, content_text, status, template_metadata, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
         RETURNING id
       `;
-      // Format vector array for pg
-      const vectorStr = `[${embedding.join(",")}]`;
       const res = await client.query(sql, [
         tenantId,
         rfpTitle,
@@ -162,7 +159,6 @@ export async function POST(req: NextRequest) {
         sector,
         extractedText,
         status,
-        vectorStr,
         templateMetadata ? JSON.stringify(templateMetadata) : null,
       ]);
       const parentId = res.rows[0].id;
