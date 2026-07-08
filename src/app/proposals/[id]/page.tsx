@@ -514,22 +514,45 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
               </button>
             </div>
 
-            {/* Compliance Meter */}
-            <div className="flex items-center gap-3 bg-white px-4 py-2 border border-gray-100 rounded-xl max-w-xs shadow-sm">
-              <span className="text-xs font-bold text-gray-500">معدل المطابقة:</span>
-              <div className="w-24 bg-gray-100 h-2 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full ${
-                    proposal.compliance_score >= 80 ? "bg-green-600" : proposal.compliance_score >= 60 ? "bg-yellow-500" : "bg-red-500"
-                  }`}
-                  style={{ width: `${proposal.compliance_score}%` }}
-                ></div>
+            {/* Compliance & Judge Score Meters */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Compliance Meter */}
+              <div className="flex items-center gap-3 bg-white px-4 py-2 border border-gray-100 rounded-xl max-w-xs shadow-sm">
+                <span className="text-xs font-bold text-gray-500">معدل المطابقة:</span>
+                <div className="w-24 bg-gray-100 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full ${
+                      proposal.compliance_score >= 80 ? "bg-green-600" : proposal.compliance_score >= 60 ? "bg-yellow-500" : "bg-red-500"
+                    }`}
+                    style={{ width: `${proposal.compliance_score}%` }}
+                  ></div>
+                </div>
+                <span className={`text-sm font-bold ${
+                  proposal.compliance_score >= 80 ? "text-green-700" : proposal.compliance_score >= 60 ? "text-yellow-600" : "text-red-600"
+                }`}>
+                  {proposal.compliance_score}%
+                </span>
               </div>
-              <span className={`text-sm font-bold ${
-                proposal.compliance_score >= 80 ? "text-green-700" : proposal.compliance_score >= 60 ? "text-yellow-600" : "text-red-600"
-              }`}>
-                {proposal.compliance_score}%
-              </span>
+
+              {/* LLM Judge Score */}
+              {proposal.judge_score !== null && proposal.judge_score !== undefined && (
+                <div className="flex items-center gap-3 bg-white px-4 py-2 border border-gray-100 rounded-xl max-w-xs shadow-sm">
+                  <span className="text-xs font-bold text-gray-500">تقييم الجودة (AI):</span>
+                  <div className="w-24 bg-gray-100 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full ${
+                        proposal.judge_score >= 80 ? "bg-emerald-600" : proposal.judge_score >= 60 ? "bg-amber-500" : "bg-rose-500"
+                      }`}
+                      style={{ width: `${proposal.judge_score}%` }}
+                    ></div>
+                  </div>
+                  <span className={`text-sm font-bold ${
+                    proposal.judge_score >= 80 ? "text-emerald-700" : proposal.judge_score >= 60 ? "text-amber-600" : "text-rose-600"
+                  }`}>
+                    {proposal.judge_score}%
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -992,6 +1015,21 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
                 <h2 className="text-base font-bold text-gray-900">قائمة بنود التحقق ومطابقة الكراسة</h2>
                 <p className="text-xs text-gray-500 mt-1">يقوم النظام تلقائياً بتحليل توافق العرض الفني والمالي مع شروط ومواصفات الكراسة المطلوبة.</p>
               </div>
+
+              {/* Judge Issues Warnings Display */}
+              {proposal.judge_issues && proposal.judge_issues.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2.5">
+                  <div className="flex items-center gap-2 text-amber-800 font-bold text-sm">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span>ملاحظات تقييم الجودة بالذكاء الاصطناعي (AI Evaluation Auditor):</span>
+                  </div>
+                  <ul className="text-xs text-amber-700 list-disc list-inside space-y-1 pr-1">
+                    {proposal.judge_issues.map((issue, idx) => (
+                      <li key={idx} className="leading-relaxed">{issue}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               <div className="space-y-4 divide-y divide-gray-100">
                 {proposal.compliance_checklist.map((item: ComplianceItem, idx: number) => (

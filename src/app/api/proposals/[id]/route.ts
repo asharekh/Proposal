@@ -32,7 +32,8 @@ export async function GET(
       tenantId,
       `SELECT id, tenant_id, rfp_data, draft_content, review_status, 
               compliance_score, compliance_checklist, reference_proposal_ids, 
-              reviewer_id, reviewed_at, exported_pdf_url, created_at 
+              reviewer_id, reviewed_at, exported_pdf_url, created_at,
+              judge_score, judge_issues
        FROM generated_proposals 
        WHERE id = $1 AND tenant_id = $2`,
       [id, tenantId]
@@ -55,6 +56,8 @@ export async function GET(
       reviewed_at: row.reviewed_at,
       exported_pdf_url: row.exported_pdf_url,
       created_at: row.created_at,
+      judge_score: row.judge_score,
+      judge_issues: typeof row.judge_issues === "string" ? JSON.parse(row.judge_issues) : row.judge_issues,
     };
 
     return NextResponse.json({ success: true, data: proposal });

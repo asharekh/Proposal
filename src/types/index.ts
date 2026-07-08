@@ -121,6 +121,8 @@ export interface GeneratedProposal {
   reviewed_at?: string | null;
   exported_pdf_url?: string | null;
   created_at: string;
+  judge_score?: number | null;
+  judge_issues?: string[] | null;
 }
 
 export interface SimilarProposal {

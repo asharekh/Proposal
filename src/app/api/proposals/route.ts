@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
       review_status: p.review_status,
       compliance_score: p.compliance_score,
       created_at: p.created_at,
+      judge_score: p.judge_score,
     }));
 
     return NextResponse.json({ success: true, data: summaries });
@@ -74,7 +75,8 @@ export async function GET(req: NextRequest) {
         rfp_data->>'proposal_type' as proposal_type, 
         review_status, 
         compliance_score, 
-        created_at 
+        created_at,
+        judge_score
       FROM generated_proposals 
       WHERE tenant_id = $1
     `;
@@ -115,7 +117,7 @@ export async function PATCH(req: NextRequest) {
     } else {
       const dbRow = await queryOne(
         tenantId,
-        "SELECT id, tenant_id, rfp_data, draft_content, review_status, compliance_score, compliance_checklist, reference_proposal_ids, created_at FROM generated_proposals WHERE id = $1",
+        "SELECT id, tenant_id, rfp_data, draft_content, review_status, compliance_score, compliance_checklist, reference_proposal_ids, created_at, judge_score, judge_issues FROM generated_proposals WHERE id = $1",
         [id]
       );
       if (dbRow) {
@@ -129,6 +131,8 @@ export async function PATCH(req: NextRequest) {
           compliance_checklist: typeof dbRow.compliance_checklist === "string" ? JSON.parse(dbRow.compliance_checklist) : dbRow.compliance_checklist,
           reference_proposal_ids: typeof dbRow.reference_proposal_ids === "string" ? JSON.parse(dbRow.reference_proposal_ids) : dbRow.reference_proposal_ids,
           created_at: dbRow.created_at,
+          judge_score: dbRow.judge_score,
+          judge_issues: typeof dbRow.judge_issues === "string" ? JSON.parse(dbRow.judge_issues) : dbRow.judge_issues,
         };
       }
     }

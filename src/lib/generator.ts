@@ -525,7 +525,7 @@ ${auditResult.issues.map((issue) => `- ${issue}`).join("\n")}
     content: fallbackMock,
     compliance_score: compliance.score,
     compliance_checklist: compliance.checklist,
-    judge_score: finalJudgeScore || 70,
-    judge_issues: finalJudgeIssues || ["Fallback mock used due to generation error"],
+    judge_score: null,
+    judge_issues: ["Fallback mock used due to generation failure"],
   };
 };
