@@ -9,7 +9,8 @@ import {
   FileText, 
   Upload, 
   Settings, 
-  User 
+  User,
+  Shield
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -21,6 +22,7 @@ export default function Sidebar() {
     { name: "العروض المولّدة", href: "/proposals", icon: FileText },
     { name: "رفع عروض مرجعية", href: "/upload", icon: Upload },
     { name: "إعدادات المعهد", href: "/tenants/setup", icon: Settings },
+    { name: "إدارة النظام (Superadmin)", href: "/superadmin", icon: Shield },
   ];
 
   return (
