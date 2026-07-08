@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 6. Generate proposal using Gemini
-      const { content, compliance_score, compliance_checklist } = await generateProposal(
+      const { content, compliance_score, compliance_checklist, judge_score, judge_issues } = await generateProposal(
         rfpData,
         ragContext,
         tenantName
@@ -197,14 +197,16 @@ export async function POST(req: NextRequest) {
           if (!client) return;
           const sql = `
             UPDATE generated_proposals
-            SET draft_content = $1, compliance_score = $2, compliance_checklist = $3, reference_proposal_ids = $4, review_status = 'in_review'
-            WHERE id = $5
+            SET draft_content = $1, compliance_score = $2, compliance_checklist = $3, reference_proposal_ids = $4, review_status = 'in_review', judge_score = $5, judge_issues = $6
+            WHERE id = $7
           `;
           await client.query(sql, [
             JSON.stringify(content),
             compliance_score,
             JSON.stringify(compliance_checklist),
             JSON.stringify(refIds),
+            judge_score,
+            judge_issues ? JSON.stringify(judge_issues) : null,
             proposalId,
           ]);
         });
@@ -216,6 +218,8 @@ export async function POST(req: NextRequest) {
           genProp.compliance_checklist = compliance_checklist;
           genProp.reference_proposal_ids = refIds;
           genProp.review_status = "in_review";
+          (genProp as any).judge_score = judge_score;
+          (genProp as any).judge_issues = judge_issues;
         }
       }
 

@@ -122,7 +122,7 @@ export const findSimilarProposals = async (
           p.sector, 
           c.content_text, 
           p.status,
-          (- (c.embedding <#> $1::vector)) as similarity
+          (- (c.embedding <#> $1::vector)) * (1.0 - LEAST(0.5, EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 315360000.0)) as similarity
         FROM proposal_chunks c
         JOIN proposals p ON c.proposal_id = p.id
         WHERE c.tenant_id = $2 
@@ -157,7 +157,7 @@ export const findSimilarProposals = async (
           p.sector, 
           c.content_text, 
           p.status,
-          (- (c.embedding <#> $1::vector)) as similarity
+          (- (c.embedding <#> $1::vector)) * (1.0 - LEAST(0.5, EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 315360000.0)) as similarity
         FROM proposal_chunks c
         JOIN proposals p ON c.proposal_id = p.id
         WHERE c.tenant_id = $2 

@@ -303,7 +303,13 @@ export const generateProposal = async (
   rfp: RFPInput,
   ragContext: string,
   tenantName: string
-): Promise<{ content: ProposalContent; compliance_score: number; compliance_checklist: ComplianceItem[] }> => {
+): Promise<{
+  content: ProposalContent;
+  compliance_score: number;
+  compliance_checklist: ComplianceItem[];
+  judge_score: number | null;
+  judge_issues: string[] | null;
+}> => {
   // If in mock mode, return mock content instantly
   if (isMockMode()) {
     if (rfp.other_requirements && rfp.other_requirements.includes("FAIL_GENERATION")) {
@@ -316,17 +322,21 @@ export const generateProposal = async (
       content: mockContent,
       compliance_score: compliance.score,
       compliance_checklist: compliance.checklist,
+      judge_score: 90,
+      judge_issues: [],
     };
   }
 
   // 1. Initialize Langfuse Trace
   const langfuse = getLangfuse();
+  const promptVersion = "v1.2.0"; // Prompt versioning tag
   const trace = langfuse ? langfuse.trace({
     name: "Generate Proposal",
     metadata: {
       client: rfp.client_name,
       title: rfp.title,
-      type: rfp.proposal_type
+      type: rfp.proposal_type,
+      prompt_version: promptVersion,
     }
   }) : null;
 
@@ -370,14 +380,18 @@ ${ragContext}
 
   let lastError: any = null;
   const timeoutMs = 90000;
+  let finalJudgeScore: number | null = null;
+  let finalJudgeIssues: string[] | null = null;
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    const generationSpan = trace ? trace.span({
+    const generationSpan = trace ? trace.generation({
       name: `Gemini Generation Run - Attempt ${attempt}`,
-      input: prompt
+      model: "gemini-2.5-flash",
+      input: prompt,
+      modelParameters: { temperature: 0.2 }
     }) : null;
 
     try {
@@ -415,9 +429,16 @@ ${ragContext}
         throw new Error("Generated JSON misses key proposal sections");
       }
 
+      const usage = result.response.usageMetadata;
+
       if (generationSpan) {
         generationSpan.update({
           output: jsonStr,
+          usage: usage ? {
+            input: usage.promptTokenCount,
+            output: usage.candidatesTokenCount,
+            total: usage.totalTokenCount
+          } : undefined,
           metadata: { latency_ms: responseTime }
         });
         generationSpan.end();
@@ -426,6 +447,9 @@ ${ragContext}
       // 2. Perform LLM-as-a-Judge Evaluation Gating
       console.log(`[Generator] Run evaluation judge audit check...`);
       const auditResult = await auditProposalWithJudge(rfp, content);
+      
+      finalJudgeScore = auditResult.score;
+      finalJudgeIssues = auditResult.issues;
 
       if (!auditResult.passed && attempt < 3) {
         console.warn(`[Generator] Audit check failed on attempt ${attempt}. Feedback: ${auditResult.issues.join(", ")}. Retrying with self-correction prompt.`);
@@ -462,6 +486,8 @@ ${auditResult.issues.map((issue) => `- ${issue}`).join("\n")}
         content,
         compliance_score: compliance.score,
         compliance_checklist: compliance.checklist,
+        judge_score: finalJudgeScore,
+        judge_issues: finalJudgeIssues,
       };
     } catch (error: any) {
       clearTimeout(timeoutId);
@@ -499,5 +525,7 @@ ${auditResult.issues.map((issue) => `- ${issue}`).join("\n")}
     content: fallbackMock,
     compliance_score: compliance.score,
     compliance_checklist: compliance.checklist,
+    judge_score: finalJudgeScore || 70,
+    judge_issues: finalJudgeIssues || ["Fallback mock used due to generation error"],
   };
 };

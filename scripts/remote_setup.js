@@ -23,6 +23,7 @@ conn.on('ready', () => {
     docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/migration.sql
     docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/02_memory_schemas.sql
     docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/03_pptx_template_schema.sql
+    docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/04_judge_metrics_schema.sql
     
     # 3. Free up disk space from old dangling docker assets
     echo "Pruning unused Docker assets..."
