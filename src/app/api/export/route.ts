@@ -964,6 +964,10 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Proposal not found", { status: 404 });
     }
 
+    if (proposal.review_status !== "approved" && proposal.review_status !== "exported") {
+      return new NextResponse("لا يمكن تصدير العرض قبل اعتماده. يرجى اعتماد العرض أولاً من صفحة المراجعة.", { status: 403 });
+    }
+
     // Load template metadata from primary reference proposal if present
     let templateMetadata: any = null;
     if (proposal.reference_proposal_ids && proposal.reference_proposal_ids.length > 0) {
