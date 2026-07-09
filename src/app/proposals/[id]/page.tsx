@@ -299,7 +299,12 @@ export default function ProposalReview({ params }: { params: { id: string } }) {
         alert(json.message);
         fetchProposal(); // Refresh UI data
       } else {
-        alert(json.error || "فشل تنفيذ الإجراء.");
+        if (json.missing_items && Array.isArray(json.missing_items)) {
+          const listStr = json.missing_items.map((item: string) => `• ${item}`).join("\n");
+          alert(`${json.error || "فشل تنفيذ الإجراء."}\n\n${listStr}`);
+        } else {
+          alert(json.error || "فشل تنفيذ الإجراء.");
+        }
       }
     } catch (err) {
       alert("حدث خطأ في الاتصال بالخادم.");

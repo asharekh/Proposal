@@ -104,6 +104,43 @@ const extractJsonString = (text: string): string => {
 };
 
 /**
+ * Validates that all financial breakdown elements are complete (i.e. not null or zero)
+ */
+export const validateFinancialCompleteness = (
+  rfp: RFPInput,
+  content: ProposalContent
+): { complete: boolean; missingItems: string[] } => {
+  // Technical-only proposals never require financial data
+  if (rfp.proposal_type === "technical") {
+    return { complete: true, missingItems: [] };
+  }
+
+  const missingItems: string[] = [];
+
+  if (!content.financial || !content.financial.breakdown || content.financial.breakdown.length === 0) {
+    return { complete: false, missingItems: ["لا يوجد جدول تسعير مالي في العرض"] };
+  }
+
+  content.financial.breakdown.forEach((item) => {
+    if (item.unit_price === null || item.unit_price === 0 || item.total === null || item.total === 0) {
+      missingItems.push(`السعر غير مكتمل للبند: "${item.item}"`);
+    }
+  });
+
+  if (content.financial.total_before_vat === null) {
+    missingItems.push("المجموع الفرعي (قبل الضريبة) غير محدد");
+  }
+  if (content.financial.vat_amount === null) {
+    missingItems.push("قيمة ضريبة القيمة المضافة غير محددة");
+  }
+  if (content.financial.total_after_vat === null) {
+    missingItems.push("المجموع الكلي (شامل الضريبة) غير محدد");
+  }
+
+  return { complete: missingItems.length === 0, missingItems };
+};
+
+/**
  * Calculates a detailed compliance checklist and score from generated content
  */
 export const calculateCompliance = (

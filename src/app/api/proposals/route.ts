@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { query, queryOne, executeIsolatedQuery, memoryStore, checkDbConnection } from "@/lib/db";
 import { isMockMode, getTenantId } from "@/lib/config";
 import { ProposalContent, GeneratedProposal } from "@/types";
-import { calculateCompliance } from "@/lib/generator";
+import { calculateCompliance, validateFinancialCompleteness } from "@/lib/generator";
 import { getEmbedding } from "@/lib/embeddings";
 import { distillClientGuidelines } from "@/lib/judge";
 
@@ -180,6 +180,14 @@ export async function PATCH(req: NextRequest) {
 
     // ACTION: approve
     if (action === "approve") {
+      const { complete, missingItems } = validateFinancialCompleteness(proposal.rfp_data, proposal.draft_content);
+      if (!complete) {
+        return NextResponse.json(
+          { success: false, error: "لا يمكن اعتماد العرض قبل استكمال جميع البيانات المالية.", missing_items: missingItems },
+          { status: 400 }
+        );
+      }
+
       const reviewerId = "00000000-0000-0000-0000-000000000002"; // dummy reviewer id
 
       if (!isDbConnected) {
