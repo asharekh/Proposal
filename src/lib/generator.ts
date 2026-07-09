@@ -302,13 +302,22 @@ const generateMockProposal = (rfp: RFPInput, tenantName: string): ProposalConten
 export const generateProposal = async (
   rfp: RFPInput,
   ragContext: string,
-  tenantName: string
+  tenantName: string,
+  tenantId: string
 ): Promise<{
   content: ProposalContent;
   compliance_score: number;
   compliance_checklist: ComplianceItem[];
   judge_score: number | null;
   judge_issues: string[] | null;
+  usage_events: Array<{
+    call_type: "generation" | "judge";
+    model: string;
+    attempt_number: number;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+  }>;
 }> => {
   // If in mock mode, return mock content instantly
   if (isMockMode()) {
@@ -324,6 +333,7 @@ export const generateProposal = async (
       compliance_checklist: compliance.checklist,
       judge_score: 90,
       judge_issues: [],
+      usage_events: [],
     };
   }
 
@@ -337,6 +347,7 @@ export const generateProposal = async (
       title: rfp.title,
       type: rfp.proposal_type,
       prompt_version: promptVersion,
+      tenant_id: tenantId,
     }
   }) : null;
 
@@ -382,6 +393,14 @@ ${ragContext}
   const timeoutMs = 90000;
   let finalJudgeScore: number | null = null;
   let finalJudgeIssues: string[] | null = null;
+  const usageEvents: Array<{
+    call_type: "generation" | "judge";
+    model: string;
+    attempt_number: number;
+    prompt_tokens: number | null;
+    completion_tokens: number | null;
+    total_tokens: number | null;
+  }> = [];
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     const controller = new AbortController();
@@ -416,6 +435,16 @@ ${ragContext}
 
       clearTimeout(timeoutId);
 
+      const usage = result.response.usageMetadata;
+      usageEvents.push({
+        call_type: "generation",
+        model: "gemini-2.5-flash",
+        attempt_number: attempt,
+        prompt_tokens: usage?.promptTokenCount ?? null,
+        completion_tokens: usage?.candidatesTokenCount ?? null,
+        total_tokens: usage?.totalTokenCount ?? null
+      });
+
       const responseText = result.response.text();
       if (!responseText) {
         throw new Error("Received empty response from Gemini API");
@@ -428,8 +457,6 @@ ${ragContext}
       if (!content.executive_summary || !content.about_institute || !content.methodology) {
         throw new Error("Generated JSON misses key proposal sections");
       }
-
-      const usage = result.response.usageMetadata;
 
       if (generationSpan) {
         generationSpan.update({
@@ -448,6 +475,15 @@ ${ragContext}
       console.log(`[Generator] Run evaluation judge audit check...`);
       const auditResult = await auditProposalWithJudge(rfp, content);
       
+      usageEvents.push({
+        call_type: "judge",
+        model: "gemini-2.5-flash",
+        attempt_number: attempt,
+        prompt_tokens: auditResult.usage?.promptTokens ?? null,
+        completion_tokens: auditResult.usage?.completionTokens ?? null,
+        total_tokens: auditResult.usage?.totalTokens ?? null
+      });
+
       finalJudgeScore = auditResult.score;
       finalJudgeIssues = auditResult.issues;
 
@@ -488,6 +524,7 @@ ${auditResult.issues.map((issue) => `- ${issue}`).join("\n")}
         compliance_checklist: compliance.checklist,
         judge_score: finalJudgeScore,
         judge_issues: finalJudgeIssues,
+        usage_events: usageEvents,
       };
     } catch (error: any) {
       clearTimeout(timeoutId);
@@ -527,5 +564,6 @@ ${auditResult.issues.map((issue) => `- ${issue}`).join("\n")}
     compliance_checklist: compliance.checklist,
     judge_score: null,
     judge_issues: ["Fallback mock used due to generation failure"],
+    usage_events: usageEvents,
   };
 };

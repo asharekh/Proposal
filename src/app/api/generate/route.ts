@@ -183,10 +183,11 @@ export async function POST(req: NextRequest) {
       }
 
       // 6. Generate proposal using Gemini
-      const { content, compliance_score, compliance_checklist, judge_score, judge_issues } = await generateProposal(
+      const { content, compliance_score, compliance_checklist, judge_score, judge_issues, usage_events } = await generateProposal(
         rfpData,
         ragContext,
-        tenantName
+        tenantName,
+        tenantId
       );
 
       const refIds = similarProposals.map((p) => p.id);
@@ -209,6 +210,25 @@ export async function POST(req: NextRequest) {
             judge_issues ? JSON.stringify(judge_issues) : null,
             proposalId,
           ]);
+
+          if (usage_events && usage_events.length > 0) {
+            const usageSql = `
+              INSERT INTO token_usage (tenant_id, proposal_id, call_type, model, attempt_number, prompt_tokens, completion_tokens, total_tokens)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `;
+            for (const event of usage_events) {
+              await client.query(usageSql, [
+                tenantId,
+                proposalId,
+                event.call_type,
+                event.model,
+                event.attempt_number,
+                event.prompt_tokens,
+                event.completion_tokens,
+                event.total_tokens
+              ]);
+            }
+          }
         });
       } else {
         const genProp = memoryStore.generatedProposals.get(proposalId);

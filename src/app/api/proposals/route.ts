@@ -246,13 +246,12 @@ export async function PATCH(req: NextRequest) {
         }
       }
 
-      // Generate embedding vector so RAG matches future proposals using this learning
       let embedding: number[] = [];
       try {
         embedding = await getEmbedding(compiledText, {
           title: proposal.rfp_data.title,
           trainingType: proposal.rfp_data.training_type,
-          sector: proposal.rfp_data.client_sector,
+          sector: proposal.rfp_data.client_sector || undefined,
         });
       } catch (err) {
         console.error("Failed to generate embedding for learning loop:", err);
@@ -286,7 +285,7 @@ export async function PATCH(req: NextRequest) {
 
             const vectorStr = `[${embedding.join(",")}]`;
 
-            if (exists.rowCount > 0) {
+            if (exists.rowCount !== null && exists.rowCount > 0) {
               // Update existing reference status
               await client.query(
                 "UPDATE proposals SET status = $1, content_text = $2, embedding = $3::vector WHERE id = $4",

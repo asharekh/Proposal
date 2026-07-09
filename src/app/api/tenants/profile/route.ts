@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
           [tenantId]
         );
 
-        if (profileExists.rowCount > 0) {
+        if (profileExists.rowCount !== null && profileExists.rowCount > 0) {
           await client.query(
             `UPDATE tenant_proposal_profiles 
              SET writing_style = $1, specializations = $2, fixed_terms = $3, last_updated = NOW() 

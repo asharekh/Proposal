@@ -30,6 +30,7 @@ export interface AuditResult {
   passed: boolean;
   score: number;
   issues: string[];
+  usage?: { promptTokens: number; completionTokens: number; totalTokens: number } | null;
 }
 
 /**
@@ -44,7 +45,8 @@ export const auditProposalWithJudge = async (
     return {
       passed: true,
       score: 95,
-      issues: []
+      issues: [],
+      usage: null
     };
   }
 
@@ -99,14 +101,24 @@ ${proposal.methodology?.approach || ""}
 
     const auditData = JSON.parse(responseText.trim()) as AuditResult;
     console.log(`[Judge] Audited Proposal. Score: ${auditData.score}%. Passed: ${auditData.passed}. Issues count: ${auditData.issues.length}`);
-    return auditData;
+    
+    const usage = result.response.usageMetadata;
+    return {
+      ...auditData,
+      usage: usage ? {
+        promptTokens: usage.promptTokenCount,
+        completionTokens: usage.candidatesTokenCount,
+        totalTokens: usage.totalTokenCount
+      } : null
+    };
   } catch (error) {
     console.error("[Judge] Audit execution failed, returning default pass fallback:", error);
     // Fallback: Default to true to prevent blocking generation if judge model fails
     return {
       passed: true,
       score: 85,
-      issues: []
+      issues: [],
+      usage: null
     };
   }
 };

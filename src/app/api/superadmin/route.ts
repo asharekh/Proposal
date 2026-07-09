@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
         license_number: "TVTC-12345",
         email: "info@excellence-training.sa",
         phone: "+966501234567",
-        proposals_count: 14
+        proposals_count: 14,
+        tokens_last_30d: 12500
       },
       {
         id: "a0000000-0000-0000-0000-000000000002",
@@ -28,7 +29,8 @@ export async function GET(req: NextRequest) {
         license_number: "TVTC-88990",
         email: "admin@knowledge-academy.sa",
         phone: "+966551122334",
-        proposals_count: 8
+        proposals_count: 8,
+        tokens_last_30d: 8200
       },
       {
         id: "a0000000-0000-0000-0000-000000000003",
@@ -36,7 +38,8 @@ export async function GET(req: NextRequest) {
         license_number: "TVTC-44552",
         email: "contact@skills-development.sa",
         phone: "+966567788990",
-        proposals_count: 2
+        proposals_count: 2,
+        tokens_last_30d: 2100
       }
     ];
 
@@ -86,6 +89,26 @@ export async function GET(req: NextRequest) {
     `;
     const tenantsList = await query<any>(defaultTenantId, tenantsSql);
 
+    // Fetch token usage aggregates for the last 30 days
+    const usageSql = `
+      SELECT tenant_id, SUM(total_tokens) as total_tokens
+      FROM token_usage
+      WHERE created_at > NOW() - INTERVAL '30 days'
+      GROUP BY tenant_id
+    `;
+    const usageList = await query<{ tenant_id: string; total_tokens: string }>(defaultTenantId, usageSql);
+    const usageMap = new Map<string, number>();
+    if (usageList && usageList.length > 0) {
+      for (const row of usageList) {
+        usageMap.set(row.tenant_id, parseInt(row.total_tokens || "0", 10));
+      }
+    }
+
+    const tenantsWithUsage = tenantsList.map((tenant: any) => ({
+      ...tenant,
+      tokens_last_30d: usageMap.get(tenant.id) || 0
+    }));
+
     // 3. Fetch recent generations cross-tenant
     const recentSql = `
       SELECT g.id, t.name as tenant_name, g.rfp_data->>'title' as title, g.compliance_score, g.judge_score, g.created_at 
@@ -105,7 +128,7 @@ export async function GET(req: NextRequest) {
           references_count: referencesRow ? parseInt(referencesRow.count, 10) : 0,
           avg_judge_score: avgJudgeRow && avgJudgeRow.avg ? parseInt(avgJudgeRow.avg, 10) : 85
         },
-        tenants: tenantsList,
+        tenants: tenantsWithUsage,
         recent_proposals: recentList
       }
     });

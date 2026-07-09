@@ -28,12 +28,12 @@ if (typeof window === "undefined") {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
     
-    for (const [key, record] of rateLimitMap.entries()) {
-      record.timestamps = record.timestamps.filter((t) => t > oneMinuteAgo);
+    rateLimitMap.forEach((record, key) => {
+      record.timestamps = record.timestamps.filter((t: number) => t > oneMinuteAgo);
       if (record.timestamps.length === 0) {
         rateLimitMap.delete(key);
       }
-    }
+    });
     console.log(`[Rate Limiter] Periodic cleanup ran. Active rate-limit keys: ${rateLimitMap.size}`);
   }, 300000); // 5 minutes
 }
@@ -54,7 +54,7 @@ export const rateLimit = (ip: string, endpoint: string, limit: number = 10): boo
   }
 
   // Filter timestamps within the last 1 minute
-  record.timestamps = record.timestamps.filter((t) => t > oneMinuteAgo);
+  record.timestamps = record.timestamps.filter((t: number) => t > oneMinuteAgo);
 
   if (record.timestamps.length >= limit) {
     return false;
