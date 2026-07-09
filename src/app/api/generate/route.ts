@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { queryOne, executeIsolatedQuery, memoryStore, checkDbConnection } from "@/lib/db";
 import { isMockMode, getTenantId } from "@/lib/config";
-import { rateLimit } from "@/lib/rate-limit";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { findSimilarProposals, buildRAGContext } from "@/lib/rag";
 import { generateProposal } from "@/lib/generator";
 import { RFPInput, GeneratedProposal } from "@/types";
@@ -34,7 +34,7 @@ const rfpInputSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     // 1. Rate Limit Check (10 requests/minute/IP)
-    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
+    const ip = getClientIp(req);
     if (!rateLimit(ip, "/api/generate")) {
       return NextResponse.json(
         { success: false, error: "تم تجاوز الحد الأقصى للمعدل المسموح به (10 طلبات في الدقيقة). يرجى المحاولة لاحقاً." },

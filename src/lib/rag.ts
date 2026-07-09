@@ -233,8 +233,9 @@ export const buildRAGContext = async (
 
     sortedProposals.forEach((p, idx) => {
       const isWon = p.status === "won";
-      const characterLimit = isWon ? 2500 : 1200;
-      const cleanContent = p.content_text.substring(0, characterLimit);
+      // Chunks are already restricted to ~1200 chars at upload time, so we don't apply an arbitrary sub-truncation.
+      // Prioritization of won proposals is achieved via the sort order above.
+      const cleanContent = p.content_text;
 
       context += `[عرض مرجعي #${idx + 1}] (${isWon ? "مرجع رئيسي - عرض فائز" : "عرض سابق"})\n`;
       context += `العنوان: ${p.rfp_title}\n`;

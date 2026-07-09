@@ -28,6 +28,16 @@ import pptxgen from "pptxgenjs";
 // puppeteer-core for PDF export
 import puppeteer from "puppeteer-core";
 
+const escapeHtml = (str: string | null | undefined): string => {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
+
 export const dynamic = "force-dynamic";
 
 // Standard Arabic layout helpers for docx
@@ -660,6 +670,8 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant, t
   const structure = templateMetadata?.slide_structure;
   if (structure && Array.isArray(structure) && structure.length > 0) {
     let textCount = 0;
+    let hasFinancialsSlide = false;
+
     structure.forEach((entry: any) => {
       const type = entry.layout_type;
       const title = entry.title || "";
@@ -682,11 +694,20 @@ function generatePptx(rfp: RFPInput, content: ProposalContent, tenant: Tenant, t
       } else if (type === "timeline") {
         renderTimelineSlide(title);
       } else if (type === "financials") {
+        hasFinancialsSlide = true;
         renderFinancialsSlide(title);
       } else if (type === "closing") {
+        if (rfp.proposal_type !== "technical" && content.financial && !hasFinancialsSlide) {
+          hasFinancialsSlide = true;
+          renderFinancialsSlide("4. العرض المالي والرسوم المقترحة");
+        }
         renderClosingSlide();
       }
     });
+
+    if (rfp.proposal_type !== "technical" && content.financial && !hasFinancialsSlide) {
+      renderFinancialsSlide("4. العرض المالي والرسوم المقترحة");
+    }
   } else {
     // Fall back to original hardcoded slide sequence
     renderCoverSlide();
@@ -710,7 +731,7 @@ const renderHtmlProposal = (rfp: RFPInput, content: ProposalContent, tenant: Ten
     <html lang="ar" dir="rtl">
     <head>
       <meta charset="UTF-8">
-      <title>${rfp.title}</title>
+      <title>${escapeHtml(rfp.title)}</title>
       <style>
         body { font-family: 'Arial', sans-serif; color: #111827; background-color: #ffffff; padding: 40px; margin: 0; line-height: 1.6; }
         .page { width: 100%; max-width: 800px; margin: 0 auto; box-sizing: border-box; }
@@ -744,18 +765,18 @@ const renderHtmlProposal = (rfp: RFPInput, content: ProposalContent, tenant: Ten
         <!-- Cover Page -->
         <div class="cover-page">
           <div>
-            <div class="institute-name">${tenant.name}</div>
+            <div class="institute-name">${escapeHtml(tenant.name)}</div>
             <div class="cover-title">عرض تقديم برنامج تدريبي متكامل</div>
-            <div class="cover-subtitle">${rfp.title}</div>
+            <div class="cover-subtitle">${escapeHtml(rfp.title)}</div>
           </div>
           <table class="info-table">
             <tr>
               <td class="label">العميل المستهدف</td>
-              <td>${rfp.client_name}</td>
+              <td>${escapeHtml(rfp.client_name)}</td>
             </tr>
             <tr>
               <td class="label">نوع البرنامج</td>
-              <td>${rfp.training_type}</td>
+              <td>${escapeHtml(rfp.training_type)}</td>
             </tr>
             <tr>
               <td class="label">مدة وتوزيع التدريب</td>
@@ -767,38 +788,38 @@ const renderHtmlProposal = (rfp: RFPInput, content: ProposalContent, tenant: Ten
             </tr>
           </table>
           <div style="font-size: 12px; color: #9CA3AF; margin-bottom: 40px;">
-            سري للغاية - وثيقة خاصة بـ ${rfp.client_name}
+            سري للغاية - وثيقة خاصة بـ ${escapeHtml(rfp.client_name)}
           </div>
         </div>
 
         <!-- Executive Summary -->
         <h1>1. الملخص التنفيذي</h1>
-        <p>${content.executive_summary.replace(/\n/g, "<br>")}</p>
+        <p>${escapeHtml(content.executive_summary).replace(/\n/g, "<br>")}</p>
 
         <!-- About Institute -->
         <h1>2. نبذة عن المعهد</h1>
-        <p>${content.about_institute.replace(/\n/g, "<br>")}</p>
+        <p>${escapeHtml(content.about_institute).replace(/\n/g, "<br>")}</p>
 
         <!-- Methodology -->
         <h1>3. منهجية وأسلوب التدريب</h1>
-        <p>${content.methodology?.approach || ""}</p>
+        <p>${escapeHtml(content.methodology?.approach || "")}</p>
         
         <h2>مراحل تنفيذ المشروع التدريبي:</h2>
         ${(content.methodology?.phases || []).map((p) => `
           <div class="phase">
-            <div class="phase-title">المرحلة ${p.number}: ${p.title}</div>
-            <div class="phase-duration">المدة: ${p.duration}</div>
-            <p>${p.description}</p>
+            <div class="phase-title">المرحلة ${p.number}: ${escapeHtml(p.title)}</div>
+            <div class="phase-duration">المدة: ${escapeHtml(p.duration)}</div>
+            <p>${escapeHtml(p.description)}</p>
             <div style="font-size: 13px; font-weight: bold; margin-top: 5px;">مخرجات وأهداف المرحلة:</div>
             <ul style="font-size: 13px; color: #4B5563; margin-top: 5px; padding-right: 20px;">
-              ${p.objectives.map((obj) => `<li>${obj}</li>`).join("")}
+              ${p.objectives.map((obj) => `<li>${escapeHtml(obj)}</li>`).join("")}
             </ul>
           </div>
         `).join("")}
 
         <h2>الأدوات والمواد العلمية:</h2>
         <ul style="font-size: 14px; color: #374151; padding-right: 20px;">
-          ${(content.methodology?.tools_and_resources || []).map((t) => `<li>${t}</li>`).join("")}
+          ${(content.methodology?.tools_and_resources || []).map((t) => `<li>${escapeHtml(t)}</li>`).join("")}
         </ul>
 
         <!-- Timeline -->
@@ -813,8 +834,8 @@ const renderHtmlProposal = (rfp: RFPInput, content: ProposalContent, tenant: Ten
           <tbody>
             ${(content.timeline || []).map((t) => `
               <tr>
-                <td>${t.week}</td>
-                <td style="text-align: right; padding-right: 15px;">${t.activity}</td>
+                <td>${escapeHtml(t.week)}</td>
+                <td style="text-align: right; padding-right: 15px;">${escapeHtml(t.activity)}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -840,7 +861,7 @@ const renderHtmlProposal = (rfp: RFPInput, content: ProposalContent, tenant: Ten
             <tbody>
               ${content.financial.breakdown.map((item) => `
                 <tr>
-                  <td class="text-right" style="padding-right: 15px;">${item.item}</td>
+                  <td class="text-right" style="padding-right: 15px;">${escapeHtml(item.item)}</td>
                   <td>${item.quantity}</td>
                   <td>${item.unit_price !== null ? `${item.unit_price} ريال` : "يحدد لاحقاً"}</td>
                   <td>${item.total !== null ? `${item.total} ريال` : "يحدد لاحقاً"}</td>
@@ -863,12 +884,12 @@ const renderHtmlProposal = (rfp: RFPInput, content: ProposalContent, tenant: Ten
             </tbody>
           </table>
           <h2>شروط وأحكام الدفع:</h2>
-          <p>${content.financial.payment_terms}</p>
+          <p>${escapeHtml(content.financial.payment_terms)}</p>
         ` : ""}
 
         <!-- Terms and conditions -->
         <h1>6. الشروط والأحكام العامة</h1>
-        <p>${content.terms_and_conditions.replace(/\n/g, "<br>")}</p>
+        <p>${escapeHtml(content.terms_and_conditions).replace(/\n/g, "<br>")}</p>
       </div>
       <!-- Auto trigger print for PDF export fallback -->
       <script>

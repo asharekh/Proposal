@@ -1,3 +1,21 @@
+import { NextRequest } from "next/server";
+
+export const getClientIp = (req: NextRequest): string => {
+  const xRealIp = req.headers.get("x-real-ip");
+  if (xRealIp) {
+    return xRealIp.trim();
+  }
+  const xForwardedFor = req.headers.get("x-forwarded-for");
+  if (xForwardedFor) {
+    const parts = xForwardedFor.split(",");
+    const lastPart = parts[parts.length - 1];
+    if (lastPart) {
+      return lastPart.trim();
+    }
+  }
+  return "127.0.0.1";
+};
+
 interface RateLimitRecord {
   timestamps: number[];
 }

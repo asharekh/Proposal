@@ -1,11 +1,28 @@
+// NOTE: SSH credentials and Gemini key should be rotated because they were historically exposed in git.
+// The following environment variables must be defined in your deployment environment:
+// - DEPLOY_SSH_HOST
+// - DEPLOY_SSH_USER
+// - DEPLOY_SSH_PASSWORD
+// - GEMINI_API_KEY
+
 const { Client } = require('ssh2');
 const conn = new Client();
 
-// Split fallback key to prevent GitHub's secret scanner from flagging it in commits
-const part1 = "AQ.Ab8RN6JfcRM85qlC";
-const part2 = "K_PNGLsxSNOAFiR0SN25qj9byPrZ-8w9jA";
-const fallbackKey = part1 + part2;
-const geminiKey = process.env.GEMINI_API_KEY || fallbackKey;
+const DEPLOY_SSH_HOST = process.env.DEPLOY_SSH_HOST;
+const DEPLOY_SSH_USER = process.env.DEPLOY_SSH_USER;
+const DEPLOY_SSH_PASSWORD = process.env.DEPLOY_SSH_PASSWORD;
+const geminiKey = process.env.GEMINI_API_KEY;
+
+const missing = [];
+if (!DEPLOY_SSH_HOST) missing.push("DEPLOY_SSH_HOST");
+if (!DEPLOY_SSH_USER) missing.push("DEPLOY_SSH_USER");
+if (!DEPLOY_SSH_PASSWORD) missing.push("DEPLOY_SSH_PASSWORD");
+if (!geminiKey) missing.push("GEMINI_API_KEY");
+
+if (missing.length > 0) {
+  console.error(`Error: Missing required environment variables: ${missing.join(", ")}`);
+  process.exit(1);
+}
 
 conn.on('ready', () => {
   console.log('SSH connection established for RAG upgrades deployment...');
@@ -80,8 +97,8 @@ conn.on('ready', () => {
     });
   });
 }).connect({
-  host: '165.245.247.183',
+  host: DEPLOY_SSH_HOST,
   port: 22,
-  username: 'root',
-  password: 'ujsf.SRQGUhrpn3$1v'
+  username: DEPLOY_SSH_USER,
+  password: DEPLOY_SSH_PASSWORD
 });
