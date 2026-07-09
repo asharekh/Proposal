@@ -35,30 +35,44 @@ conn.on('ready', () => {
     git reset --hard origin/main
     git clean -fxd
     
-    # 2. Run Database SQL Migration (pipe migration.sql into db container psql)
-    echo "Running PostgreSQL database migration..."
+    # 2. Bring down containers and prune system to avoid containerd corruption / KeyErrors
+    echo "Tearing down existing containers..."
+    docker-compose down --remove-orphans || true
+    docker system prune -a -f
+    
+    # 3. Build Next.js app with no cache
+    echo "Building Next.js app container..."
+    export GEMINI_API_KEY="${geminiKey}"
+    docker-compose build --no-cache app
+    
+    # 4. Start Database first and wait for healthiness
+    echo "Starting database..."
+    docker-compose up -d db
+    echo "Waiting for database to be healthy..."
+    for i in {1..30}; do
+      if docker exec proposal_engine_db pg_isready -U courseat -d proposal_engine; then
+        echo "Database is healthy."
+        break
+      fi
+      sleep 2
+    done
+    
+    # 5. Run Database SQL Migration
+    echo "Running PostgreSQL database migrations..."
     docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/migration.sql
     docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/02_memory_schemas.sql
     docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/03_pptx_template_schema.sql
     docker exec -i proposal_engine_db psql -U courseat -d proposal_engine < scripts/04_judge_metrics_schema.sql
     
-    # 3. Free up disk space from old dangling docker assets
-    echo "Pruning unused Docker assets..."
-    docker system prune -a -f
+    # 6. Start app and nginx
+    echo "Starting app and nginx..."
+    docker-compose up -d app nginx
     
-    # 4. Build and restart Next.js app container
-    export GEMINI_API_KEY="${geminiKey}"
-    docker-compose build app
-    
-    echo "Removing old container to prevent docker-compose KeyError..."
-    docker rm -f proposal_engine_app || true
-    docker-compose up -d app
-    
-    # Wait for the container to start up (approx 5-10 seconds)
+    # Wait for the app container to start up (approx 8 seconds)
     echo "Waiting for app container to start..."
     sleep 8
     
-    # 5. Run backfill migration script inside container to segment existing proposals
+    # 7. Run backfill migration script inside container to segment existing proposals
     echo "Copying backfill script into container..."
     docker cp scripts/migrate_existing.js proposal_engine_app:/app/migrate_existing.js
     echo "Running backfill segment migration..."
