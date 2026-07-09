@@ -4,6 +4,7 @@
 // - DEPLOY_SSH_USER
 // - DEPLOY_SSH_PASSWORD
 // - GEMINI_API_KEY
+// - POSTGRES_PASSWORD
 
 const { Client } = require('ssh2');
 const conn = new Client();
@@ -12,12 +13,14 @@ const DEPLOY_SSH_HOST = process.env.DEPLOY_SSH_HOST;
 const DEPLOY_SSH_USER = process.env.DEPLOY_SSH_USER;
 const DEPLOY_SSH_PASSWORD = process.env.DEPLOY_SSH_PASSWORD;
 const geminiKey = process.env.GEMINI_API_KEY;
+const postgresPassword = process.env.POSTGRES_PASSWORD;
 
 const missing = [];
 if (!DEPLOY_SSH_HOST) missing.push("DEPLOY_SSH_HOST");
 if (!DEPLOY_SSH_USER) missing.push("DEPLOY_SSH_USER");
 if (!DEPLOY_SSH_PASSWORD) missing.push("DEPLOY_SSH_PASSWORD");
 if (!geminiKey) missing.push("GEMINI_API_KEY");
+if (!postgresPassword) missing.push("POSTGRES_PASSWORD");
 
 if (missing.length > 0) {
   console.error(`Error: Missing required environment variables: ${missing.join(", ")}`);
@@ -29,6 +32,10 @@ conn.on('ready', () => {
   
   const setupSwapAndBuild = `
     cd /var/www/proposal-engine
+    
+    # Export keys for docker-compose environment interpolation
+    export GEMINI_API_KEY="${geminiKey}"
+    export POSTGRES_PASSWORD="${postgresPassword}"
     
     # 1. Force match origin/main exactly to pull latest code
     git fetch origin
@@ -42,7 +49,6 @@ conn.on('ready', () => {
     
     # 3. Build Next.js app with no cache
     echo "Building Next.js app container..."
-    export GEMINI_API_KEY="${geminiKey}"
     docker-compose build --no-cache app
     
     # 4. Start Database first and wait for healthiness
