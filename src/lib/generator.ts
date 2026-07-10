@@ -3,7 +3,7 @@ import { getEnv } from "./env";
 import { isMockMode } from "./config";
 import { RFPInput, ProposalContent, ComplianceItem } from "../types";
 import { getLangfuse } from "./trace";
-import { auditProposalWithJudge } from "./judge";
+import { auditProposalWithJudge, AuditResult } from "./judge";
 
 let genAI: GoogleGenerativeAI | null = null;
 
@@ -145,7 +145,8 @@ export const validateFinancialCompleteness = (
  */
 export const calculateCompliance = (
   rfp: RFPInput,
-  content: ProposalContent
+  content: ProposalContent,
+  judgeAudit?: AuditResult
 ): { score: number; checklist: ComplianceItem[] } => {
   const checklist: ComplianceItem[] = [];
 
@@ -168,12 +169,21 @@ export const calculateCompliance = (
   }
 
   // 1. Check title alignment
-  const titleKeywords = rfp.title.split(" ").filter((w) => w.length > 3);
-  const titleCovered = titleKeywords.some((kw) => textToScan.includes(kw.toLowerCase()));
+  let titleCovered: boolean;
+  let titleNote: string;
+  if (judgeAudit) {
+    titleCovered = judgeAudit.title_alignment.covered;
+    titleNote = judgeAudit.title_alignment.note;
+  } else {
+    // Fallback path is only used when a fresh judge audit isn't available (i.e. the update_content manual-edit path) and is known to be less precise about negation than the judge-backed path.
+    const titleKeywords = rfp.title.split(" ").filter((w) => w.length > 3);
+    titleCovered = titleKeywords.some((kw) => textToScan.includes(kw.toLowerCase()));
+    titleNote = titleCovered ? "تمت الإشارة إلى موضوع ومحاور البرنامج التدريبي في متن العرض." : "يرجى إضافة إشارة واضحة لاسم البرنامج.";
+  }
   checklist.push({
     requirement: `مواءمة البرنامج مع اسم الدورة المطلوبة: "${rfp.title}"`,
     covered: titleCovered,
-    note: titleCovered ? "تمت الإشارة إلى موضوع ومحاور البرنامج التدريبي في متن العرض." : "يرجى إضافة إشارة واضحة لاسم البرنامج.",
+    note: titleNote,
   });
 
   // 2. Check duration alignment
@@ -188,41 +198,68 @@ export const calculateCompliance = (
   });
 
   // 3. Check training type (delivery mode)
-  const trainingTypeKeywords: Record<string, string[]> = {
-    "حضوري": ["حضوري", "موقع", "مقر", "قاعة", "ميداني"],
-    "عن بعد": ["عن بعد", "افتراض", "منصة", "زوم", "تيمز"],
-    "هجين": ["هجين", "مدمج", "مشترك", "حضوري وعن بعد"],
-  };
-  const deliveryKeywords = trainingTypeKeywords[rfp.training_type] || [rfp.training_type];
-  const deliveryCovered = deliveryKeywords.some((kw) => textToScan.includes(kw.toLowerCase()));
+  let deliveryCovered: boolean;
+  let deliveryNote: string;
+  if (judgeAudit) {
+    deliveryCovered = judgeAudit.delivery_mode_alignment.covered;
+    deliveryNote = judgeAudit.delivery_mode_alignment.note;
+  } else {
+    // Fallback path is only used when a fresh judge audit isn't available (i.e. the update_content manual-edit path) and is known to be less precise about negation than the judge-backed path.
+    const trainingTypeKeywords: Record<string, string[]> = {
+      "حضوري": ["حضوري", "موقع", "مقر", "قاعة", "ميداني"],
+      "عن بعد": ["عن بعد", "افتراض", "منصة", "زوم", "تيمز"],
+      "هجين": ["هجين", "مدمج", "مشترك", "حضوري وعن بعد"],
+    };
+    const deliveryKeywords = trainingTypeKeywords[rfp.training_type] || [rfp.training_type];
+    deliveryCovered = deliveryKeywords.some((kw) => textToScan.includes(kw.toLowerCase()));
+    deliveryNote = deliveryCovered ? `العرض يذكر تقديم البرنامج بأسلوب (${rfp.training_type}) بشكل ملائم.` : `لم يتم العثور على تأكيد صريح لتقديم التدريب بأسلوب (${rfp.training_type}).`;
+  }
   checklist.push({
     requirement: `الالتزام بنوع تقديم التدريب المطلوب (${rfp.training_type})`,
     covered: deliveryCovered,
-    note: deliveryCovered ? `العرض يذكر تقديم البرنامج بأسلوب (${rfp.training_type}) بشكل ملائم.` : `لم يتم العثور على تأكيد صريح لتقديم التدريب بأسلوب (${rfp.training_type}).`,
+    note: deliveryNote,
   });
 
   // 4. Check language alignment
-  const langKeywords: Record<string, string[]> = {
-    "العربية": ["عربي", "العربية"],
-    "الإنجليزية": ["إنجليزي", "الانجليزية", "english"],
-    "كلاهما (عربي/إنجليزي)": ["عربي", "إنجليزي", "العربية والإنجليزية"],
-  };
-  const langKw = langKeywords[rfp.preferred_language] || [rfp.preferred_language];
-  const langCovered = langKw.some((kw) => textToScan.includes(kw.toLowerCase()));
+  let langCovered: boolean;
+  let langNote: string;
+  if (judgeAudit) {
+    langCovered = judgeAudit.language_alignment.covered;
+    langNote = judgeAudit.language_alignment.note;
+  } else {
+    // Fallback path is only used when a fresh judge audit isn't available (i.e. the update_content manual-edit path) and is known to be less precise about negation than the judge-backed path.
+    const langKeywords: Record<string, string[]> = {
+      "العربية": ["عربي", "العربية"],
+      "الإنجليزية": ["إنجليزي", "الانجليزية", "english"],
+      "كلاهما (عربي/إنجليزي)": ["عربي", "إنجليزي", "العربية والإنجليزية"],
+    };
+    const langKw = langKeywords[rfp.preferred_language] || [rfp.preferred_language];
+    langCovered = langKw.some((kw) => textToScan.includes(kw.toLowerCase()));
+    langNote = langCovered ? `العرض يذكر تقديم البرنامج باللغة (${rfp.preferred_language}) بشكل ملائم.` : `لم يتم العثور على تأكيد صريح لتقديم التدريب باللغة (${rfp.preferred_language}).`;
+  }
   checklist.push({
     requirement: `الالتزام بلغة تقديم التدريب المطلوبة (${rfp.preferred_language})`,
     covered: langCovered,
-    note: langCovered ? `العرض يذكر تقديم البرنامج باللغة (${rfp.preferred_language}) بشكل ملائم.` : `لم يتم العثور على تأكيد صريح لتقديم التدريب باللغة (${rfp.preferred_language}).`,
+    note: langNote,
   });
 
   // 5. Check certificate type
   const requiresCert = rfp.certificate_type && rfp.certificate_type !== "بدون شهادة" && rfp.certificate_type !== "";
   if (requiresCert) {
-    const certCovered = textToScan.includes("شهاد") || textToScan.includes("اعتماد") || textToScan.includes(rfp.certificate_type!.toLowerCase());
+    let certCovered: boolean;
+    let certNote: string;
+    if (judgeAudit) {
+      certCovered = judgeAudit.certificate_alignment.covered;
+      certNote = judgeAudit.certificate_alignment.note;
+    } else {
+      // Fallback path is only used when a fresh judge audit isn't available (i.e. the update_content manual-edit path) and is known to be less precise about negation than the judge-backed path.
+      certCovered = textToScan.includes("شهاد") || textToScan.includes("اعتماد") || textToScan.includes(rfp.certificate_type!.toLowerCase());
+      certNote = certCovered ? "تم إدراج بند شهادات الحضور المعتمدة في الشروط أو الملخص." : "الرجاء تأكيد توفير شهادات حضور معتمدة.";
+    }
     checklist.push({
       requirement: `توفير شهادات حضور أو اجتياز من النوع المطلوب: (${rfp.certificate_type})`,
       covered: certCovered,
-      note: certCovered ? "تم إدراج بند شهادات الحضور المعتمدة في الشروط أو الملخص." : "الرجاء تأكيد توفير شهادات حضور معتمدة.",
+      note: certNote,
     });
   } else {
     checklist.push({
@@ -248,6 +285,20 @@ export const calculateCompliance = (
       requirement: "عرض فني فقط - لا يتطلب تفاصيل تسعير مالية",
       covered: true,
       note: "تم استبعاد التسعير بناء على رغبة العميل بتقديم عرض فني فقط.",
+    });
+  }
+
+  // 7. Extra requirements and client notes checks (only if judgeAudit is available)
+  if (judgeAudit) {
+    checklist.push({
+      requirement: "معالجة المتطلبات الإضافية المذكورة من العميل",
+      covered: judgeAudit.other_requirements_alignment.covered,
+      note: judgeAudit.other_requirements_alignment.note,
+    });
+    checklist.push({
+      requirement: "مراعاة ملاحظات العميل الإضافية",
+      covered: judgeAudit.client_notes_alignment.covered,
+      note: judgeAudit.client_notes_alignment.note,
     });
   }
 
@@ -546,7 +597,7 @@ ${auditResult.issues.map((issue) => `- ${issue}`).join("\n")}
       }
 
       console.log("[Generator] Proposal generated successfully via Gemini and passed Judge audit!");
-      const compliance = calculateCompliance(rfp, content);
+      const compliance = calculateCompliance(rfp, content, auditResult);
 
       if (trace) {
         trace.update({

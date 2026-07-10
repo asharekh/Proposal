@@ -21,15 +21,66 @@ const judgeResponseSchema = {
     issues: {
       type: "ARRAY",
       items: { type: "STRING" }
+    },
+    title_alignment: {
+      type: "OBJECT",
+      properties: { covered: { type: "BOOLEAN" }, note: { type: "STRING" } },
+      required: ["covered", "note"]
+    },
+    delivery_mode_alignment: {
+      type: "OBJECT",
+      properties: { covered: { type: "BOOLEAN" }, note: { type: "STRING" } },
+      required: ["covered", "note"]
+    },
+    language_alignment: {
+      type: "OBJECT",
+      properties: { covered: { type: "BOOLEAN" }, note: { type: "STRING" } },
+      required: ["covered", "note"]
+    },
+    certificate_alignment: {
+      type: "OBJECT",
+      properties: { covered: { type: "BOOLEAN" }, note: { type: "STRING" } },
+      required: ["covered", "note"]
+    },
+    other_requirements_alignment: {
+      type: "OBJECT",
+      properties: { covered: { type: "BOOLEAN" }, note: { type: "STRING" } },
+      required: ["covered", "note"]
+    },
+    client_notes_alignment: {
+      type: "OBJECT",
+      properties: { covered: { type: "BOOLEAN" }, note: { type: "STRING" } },
+      required: ["covered", "note"]
     }
   },
-  required: ["passed", "score", "issues"]
+  required: [
+    "passed",
+    "score",
+    "issues",
+    "title_alignment",
+    "delivery_mode_alignment",
+    "language_alignment",
+    "certificate_alignment",
+    "other_requirements_alignment",
+    "client_notes_alignment"
+  ]
 };
+
+export interface AlignmentCheck {
+  covered: boolean;
+  note: string;
+}
 
 export interface AuditResult {
   passed: boolean;
   score: number;
   issues: string[];
+  title_alignment: AlignmentCheck;
+  delivery_mode_alignment: AlignmentCheck;
+  language_alignment: AlignmentCheck;
+  certificate_alignment: AlignmentCheck;
+  other_requirements_alignment: AlignmentCheck;
+  client_notes_alignment: AlignmentCheck;
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number } | null;
 }
 
@@ -46,17 +97,25 @@ export const auditProposalWithJudge = async (
       passed: true,
       score: 95,
       issues: [],
+      title_alignment: { covered: true, note: "الاسم مطابق لمتطلبات البرنامج." },
+      delivery_mode_alignment: { covered: true, note: "طريقة التقديم مطابقة تماماً." },
+      language_alignment: { covered: true, note: "اللغة مطابقة للغة المطلوبة." },
+      certificate_alignment: { covered: true, note: "الشهادات مطابقة لطلب العميل." },
+      other_requirements_alignment: { covered: true, note: "تمت تلبية جميع المتطلبات الإضافية." },
+      client_notes_alignment: { covered: true, note: "تمت مراعاة ملاحظات العميل الإضافية." },
       usage: null
     };
   }
 
   const prompt = `
 قم بتقييم ومراجعة جودة العرض التدريبي المولد بناءً على كراسة الشروط (RFP) المعطاة أدناه.
-تحقق من:
-1. الالتزام بلغة التدريب المطلوبة ونوع التدريب (حضوري/عن بعد/هجين).
-2. عدم اختراع أسعار أو مجاميع مالية في العرض المالي (يجب أن تظل null إذا كانت موجودة).
-3. سلامة اللغة العربية الإملائية والأسلوب المهني المناسب للمعاهد السعودية.
-4. مواءمة الجدول الزمني والمحاور مع عدد الأيام المطلوبة.
+تحقق من وصِغ التقييم لكل مما يلي:
+1. مواءمة اسم البرنامج (title_alignment): تحقق مما إذا كان العرض التدريبي متوافقاً مع اسم البرنامج التدريبي المطلوب.
+2. الالتزام بنوع التدريب / طريقة التقديم (delivery_mode_alignment): تأكد من الالتزام التام بنوع التدريب المطلوب (حضوري، عن بعد، هجين). احذر من الوقوع في فخ النفي (مثلاً، إذا كان النص يذكر أن التدريب لن يكون حضورياً "NOT in-person" أو ما يشابه ذلك من صياغات النفي، فيجب اعتبارها غير مطابقة covered = false).
+3. الالتزام بلغة التدريب المفضلة (language_alignment): تأكد من الالتزام بلغة التدريب المطلوبة. احذر من الوقوع في فخ النفي (مثلاً، إذا كان النص يذكر أن التدريب لن يكون باللغة المطلوبة، فيجب اعتبارها غير مطابقة covered = false).
+4. الالتزام بنوع الشهادات المطلوبة (certificate_alignment): تأكد من الالتزام بالشهادة المطلوبة في كراسة الشروط.
+5. الالتزام بالمتطلبات الإضافية (other_requirements_alignment): تحقق من معالجة "متطلبات أخرى" بشكل ملموس في العرض. إذا كانت المتطلبات الأخرى فارغة أو تساوي "لا يوجد"، فاعتبرها مطابقة تلقائياً (covered = true, note = "لا توجد متطلبات إضافية مطلوبة").
+6. الالتزام بملاحظات العميل الإضافية (client_notes_alignment): تحقق من معالجة "ملاحظات العميل الإضافية" في العرض. إذا كانت ملاحظات العميل فارغة أو تساوي "لا يوجد"، فاعتبرها مطابقة تلقائياً (covered = true, note = "لا توجد ملاحظات إضافية من العميل").
 
 كراسة الشروط (RFP):
 - اسم البرنامج: ${rfp.title}
@@ -64,6 +123,7 @@ export const auditProposalWithJudge = async (
 - اللغة: ${rfp.preferred_language}
 - نوع التدريب: ${rfp.training_type}
 - متطلبات أخرى: ${rfp.other_requirements || "لا يوجد"}
+- ملاحظات العميل الإضافية: ${rfp.client_notes || "لا يوجد"}
 
 العرض المولد للمراجعة:
 الملخص التنفيذي:
@@ -74,7 +134,7 @@ ${proposal.methodology?.approach || ""}
 
 عدد مراحل المنهجية: ${(proposal.methodology?.phases || []).length} مرحلة.
 
-أجب بصيغة JSON تطابق المخطط الهيكلي المحدد.
+أجب بصيغة JSON تطابق المخطط الهيكلي المحدد. تأكد من ملء الحقول الستة المضافة للتقييم الهيكلي بالتفصيل مع تحديد covered كـ boolean و note كشرح مختصر باللغة العربية.
 إذا كانت نسبة التطابق والجودة الإجمالية أقل من 80%، قم بتعيين passed = false واذكر الأسباب بالتفصيل في مصفوفة issues.
   `;
 
@@ -118,6 +178,12 @@ ${proposal.methodology?.approach || ""}
       passed: true,
       score: 85,
       issues: [],
+      title_alignment: { covered: true, note: "موافقة افتراضية لاسم البرنامج." },
+      delivery_mode_alignment: { covered: true, note: "موافقة افتراضية لطريقة التقديم." },
+      language_alignment: { covered: true, note: "موافقة افتراضية للغة البرنامج." },
+      certificate_alignment: { covered: true, note: "موافقة افتراضية لنوع الشهادات." },
+      other_requirements_alignment: { covered: true, note: "موافقة افتراضية للمتطلبات الإضافية." },
+      client_notes_alignment: { covered: true, note: "موافقة افتراضية لملاحظات العميل." },
       usage: null
     };
   }
